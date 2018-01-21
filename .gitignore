@@ -1,0 +1,12 @@
+.idea/
+
+cmake-build-debug/
+cmake-build-release/
+
+#VST sdk files are ignored due to license
+src/vst2.x/*.h
+src/vst2.x/*.cpp
+src/pluginterfaces/vst2.x/*.h
+
+*.dll
+
