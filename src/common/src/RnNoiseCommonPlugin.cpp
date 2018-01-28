@@ -1,3 +1,5 @@
+#include "common/RnNoiseCommonPlugin.h"
+
 #include <cstring>
 #include <ios>
 #include <limits>
@@ -5,19 +7,16 @@
 
 #include <rnnoise/rnnoise.h>
 
-#include "RnNoiseAudioEffect.h"
-
-RnNoiseAudioEffect::RnNoiseAudioEffect(audioMasterCallback audioMaster, VstInt32 numPrograms, VstInt32 numParams)
-        : AudioEffectX(audioMaster, numPrograms, numParams) {
-    setNumInputs(1); // mono in
-    setNumOutputs(1); // mono out
-    setUniqueID(366056);
-    canProcessReplacing(); // supports replacing mode
+void RnNoiseCommonPlugin::init() {
+    deinit();
+    createDenoiseState();
 }
 
-RnNoiseAudioEffect::~RnNoiseAudioEffect() = default;
+void RnNoiseCommonPlugin::deinit() {
+    m_denoiseState.reset();
+}
 
-void RnNoiseAudioEffect::processReplacing(float **inputs, float **outputs, VstInt32 sampleFrames) {
+void RnNoiseCommonPlugin::process(const float *in, float *out, int32_t sampleFrames) {
     if (sampleFrames == 0) {
         return;
     }
@@ -26,22 +25,18 @@ void RnNoiseAudioEffect::processReplacing(float **inputs, float **outputs, VstIn
         createDenoiseState();
     }
 
-    // Mono in/out only
-    float *inChannel0 = inputs[0];
-    float *outChannel0 = outputs[0];
-
     // Good case, we can copy less data around and rnnoise lib is built for it
     if (sampleFrames == k_denoiseFrameSize) {
         m_inputBuffer.resize(sampleFrames);
 
         for (size_t i = 0; i < sampleFrames; i++) {
-            m_inputBuffer[i] = inChannel0[i] * std::numeric_limits<short>::max();
+            m_inputBuffer[i] = in[i] * std::numeric_limits<short>::max();
         }
 
-        rnnoise_process_frame(m_denoiseState.get(), outChannel0, &m_inputBuffer[0]);
+        rnnoise_process_frame(m_denoiseState.get(), out, &m_inputBuffer[0]);
 
         for (size_t i = 0; i < sampleFrames; i++) {
-            outChannel0[i] /= std::numeric_limits<short>::max();
+            out[i] /= std::numeric_limits<short>::max();
         }
     } else {
         m_inputBuffer.resize(m_inputBuffer.size() + sampleFrames);
@@ -50,7 +45,7 @@ void RnNoiseAudioEffect::processReplacing(float **inputs, float **outputs, VstIn
         {
             float *inputBufferWriteStart = (m_inputBuffer.end() - sampleFrames).base();
             for (size_t i = 0; i < sampleFrames; i++) {
-                inputBufferWriteStart[i] = inChannel0[i] * std::numeric_limits<short>::max();
+                inputBufferWriteStart[i] = in[i] * std::numeric_limits<short>::max();
             }
         }
 
@@ -76,35 +71,19 @@ void RnNoiseAudioEffect::processReplacing(float **inputs, float **outputs, VstIn
 
         const size_t toCopyIntoOutput = std::min(m_outputBuffer.size(), static_cast<size_t>(sampleFrames));
 
-        std::memcpy(outChannel0, &m_outputBuffer[0], toCopyIntoOutput * sizeof(float));
+        std::memcpy(out, &m_outputBuffer[0], toCopyIntoOutput * sizeof(float));
 
         m_inputBuffer.erase(m_inputBuffer.begin(), m_inputBuffer.begin() + framesToProcess);
         m_outputBuffer.erase(m_outputBuffer.begin(), m_outputBuffer.begin() + toCopyIntoOutput);
 
         if (toCopyIntoOutput < sampleFrames) {
-            std::fill(outChannel0 + toCopyIntoOutput, outChannel0 + sampleFrames, 0.f);
+            std::fill(out + toCopyIntoOutput, out + sampleFrames, 0.f);
         }
     }
 }
 
-VstInt32 RnNoiseAudioEffect::startProcess() {
-    createDenoiseState();
-
-    return AudioEffectX::startProcess();
-}
-
-VstInt32 RnNoiseAudioEffect::stopProcess() {
-    m_denoiseState.reset();
-
-    return AudioEffectX::stopProcess();
-}
-
-void RnNoiseAudioEffect::createDenoiseState() {
+void RnNoiseCommonPlugin::createDenoiseState() {
     m_denoiseState = std::shared_ptr<DenoiseState>(rnnoise_create(), [](DenoiseState *st) {
         rnnoise_destroy(st);
     });
-}
-
-extern AudioEffect *createEffectInstance(audioMasterCallback audioMaster) {
-    return new RnNoiseAudioEffect(audioMaster, 0, 0);
 }

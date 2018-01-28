@@ -3,10 +3,12 @@
 cmake-build-debug/
 cmake-build-release/
 
+bin/
+
 #VST sdk files are ignored due to license
-src/vst2.x/*.h
-src/vst2.x/*.cpp
-src/pluginterfaces/vst2.x/*.h
+src/vst_plugin/vst2.x/*.h
+src/vst_plugin/vst2.x/*.cpp
+src/vst_plugin/pluginterfaces/vst2.x/*.h
 
 *.dll
 

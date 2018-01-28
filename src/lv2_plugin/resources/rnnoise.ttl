@@ -1,0 +1,24 @@
+@prefix doap:  <http://usefulinc.com/ns/doap#> .
+@prefix lv2:   <http://lv2plug.in/ns/lv2core#> .
+@prefix rdf:   <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs:  <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix units: <http://lv2plug.in/ns/extensions/units#> .
+
+<https://github.com/werman/noise-suppression-for-voice>
+	a lv2:Plugin ;
+	lv2:project <https://github.com/werman/noise-suppression-for-voice> ;
+	doap:name "Noise Suppression (RnNoise)" ;
+	doap:license <https://opensource.org/licenses/GPL-3.0> ;
+    lv2:port [
+        a lv2:AudioPort ,
+            lv2:InputPort ;
+        lv2:index 0 ;
+        lv2:symbol "in" ;
+        lv2:name "In"
+    ] , [
+	    a lv2:AudioPort ,
+			lv2:OutputPort ;
+		lv2:index 1 ;
+		lv2:symbol "out" ;
+		lv2:name "Out"
+    ] .
