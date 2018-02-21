@@ -1,7 +1,7 @@
 #pragma once
 
 #include <memory>
-#include "lv2/lv2plug.in/ns/lv2core/Plugin.hpp"
+#include "lv2core/Plugin.hpp"
 
 class RnNoiseCommonPlugin;
 

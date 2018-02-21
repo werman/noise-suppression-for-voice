@@ -17,7 +17,7 @@
 #ifndef LV2_LIB_HPP
 #define LV2_LIB_HPP
 
-#include "lv2/lv2plug.in/ns/lv2core/Plugin.hpp"
+#include "lv2core/Plugin.hpp"
 
 namespace lv2 {
 

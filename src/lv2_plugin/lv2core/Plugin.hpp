@@ -17,7 +17,7 @@
 #ifndef LV2_PLUGIN_HPP
 #define LV2_PLUGIN_HPP
 
-#include "lv2/lv2plug.in/ns/lv2core/lv2.h"
+#include "lv2core/lv2.h"
 
 namespace lv2 {
 

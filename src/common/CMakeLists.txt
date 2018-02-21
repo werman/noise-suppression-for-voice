@@ -3,6 +3,8 @@ project(RnNoisePluginCommon LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 14)
 
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
 set(COMMON_SRC
         include/common/RnNoiseCommonPlugin.h
         src/RnNoiseCommonPlugin.cpp)

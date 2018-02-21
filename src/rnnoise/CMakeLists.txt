@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.6)
 project(RnNoise LANGUAGES C)
 
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
 set(RN_NOISE_SRC
         include/rnnoise/_kiss_fft_guts.h
         include/rnnoise/arch.h

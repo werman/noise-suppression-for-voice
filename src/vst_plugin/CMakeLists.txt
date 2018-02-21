@@ -3,7 +3,9 @@ project(rnnoise_vst2_plugin)
 
 set(CMAKE_CXX_STANDARD 14)
 
-include_directories(/)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
+include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
 set(PROJECT_ROOT ../../../)
 
@@ -40,7 +42,7 @@ function(build bit)
     target_compile_options(${VST2_TARGET_X${bit}} PRIVATE ${X${bit}_COMPILE_OPTIONS})
 
     set_target_properties(${VST2_TARGET_X${bit}} PROPERTIES
-            RUNTIME_OUTPUT_DIRECTORY "${PROJECT_ROOT}/bin/x${bit}/vst")
+            LIBRARY_OUTPUT_DIRECTORY "${PROJECT_ROOT}/bin/x${bit}/vst")
 endfunction()
 
 build(32)
