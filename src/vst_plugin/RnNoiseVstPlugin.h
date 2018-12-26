@@ -24,5 +24,6 @@ public:
 private:
     static const char* s_programName;
 
-    std::unique_ptr<RnNoiseCommonPlugin> m_rnNoisePlugin;
+    std::unique_ptr<RnNoiseCommonPlugin> m_rnNoisePlugin0;
+    std::unique_ptr<RnNoiseCommonPlugin> m_rnNoisePlugin1;
 };
