@@ -8,7 +8,7 @@ The plugin is meant to suppress a wide range of noise origins ([from original pa
 
 From my tests mild background noise is always suppressed, loud sounds, like clicking of mechanical keyboard, are suppressed while there is no voice however they are only reduced in volume when voice is present. 
 
-The plugin is made to work with 1 channel and/or 2 channels (ladspa and VST plugin), 16 bit, 48000 Hz audio input. Other sample rates may work, or not...
+The plugin is made to work with 2 channels, 16 bit, 48000 Hz audio input. It seems to work also with mono channels and 44100 Hz. Other sample rates may work, or not...
 
 ## How-to
 
