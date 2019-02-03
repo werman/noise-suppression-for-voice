@@ -85,21 +85,21 @@ If you did not download and place VST sdk files - VST plugin won't be built.
 
 Compiling for x64:
 ```
-cmake -Bbuild-x64 -H.
+cmake -Bbuild-x64 -H. -DCMAKE_BUILD_TYPE=Release
 cd build-x64
 make 
 ```
 
 Compiling for x32:
 ```
-cmake -D CMAKE_CXX_FLAGS=-m32 -D CMAKE_C_FLAGS=-m32 -Bbuild-x32 -H.
+cmake -D CMAKE_CXX_FLAGS=-m32 -D CMAKE_C_FLAGS=-m32 -Bbuild-x32 -H. -DCMAKE_BUILD_TYPE=Release
 cd build-x32
 make
 ```
 
 Cross-compiling for Windows x64:
 ```
-cmake -Bbuild-mingw64 -H.  -DCMAKE_TOOLCHAIN_FILE=toolchains/toolchain-mingw64.cmake
+cmake -Bbuild-mingw64 -H.  -DCMAKE_TOOLCHAIN_FILE=toolchains/toolchain-mingw64.cmake -DCMAKE_BUILD_TYPE=Release
 cd build-mingw64
 make
 ```
