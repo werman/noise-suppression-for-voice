@@ -32,7 +32,7 @@ The idea is:
 ```
 pacmd load-module module-null-sink sink_name=mic_denoised_out  
 
-pacmd load-module module-ladspa-sink sink_name=mic_raw_in sink_master=mic_denoised_out label=noise_suppressor plugin=librnnoise_ladspa_x64.so
+pacmd load-module module-ladspa-sink sink_name=mic_raw_in sink_master=mic_denoised_out label=noise_suppressor plugin=/path/to/librnnoise_ladspa.so
 
 pacmd load-module module-loopback source=your_mic_name sink=mic_raw_in channels=1
 ```
@@ -43,11 +43,13 @@ This should be executed every time pulse audio is launched. This can be done by 
 .include /etc/pulse/default.pa
 
 load-module module-null-sink sink_name=mic_denoised_out  
-load-module module-ladspa-sink sink_name=mic_raw_in sink_master=mic_denoised_out label=noise_suppressor plugin=librnnoise_ladspa_x64.so
+load-module module-ladspa-sink sink_name=mic_raw_in sink_master=mic_denoised_out label=noise_suppressor plugin=/path/to/librnnoise_ladspa.so
 load-module module-loopback source=your_mic_name sink=mic_raw_in channels=1
 
 set-default-source mic_denoised_out.monitor
 ```
+
+You can get `librnnoise_ladspa.so` either by downloading latest release or by compiling it yourself.
 
 Your mic name can be found by:
 
@@ -75,13 +77,32 @@ LV2 and LADSPA sdk files are in repository.
 
 All improvements are welcomed!
 
-## ☑ TODO
+### Compiling
 
-- [X] Create LV2 plugin. (Untested)
-- [X] Create LADSPA plugin.
-- [X] Create correct setup with pulseaudio.
-- [ ] Create package for linux distros (I don't here experience here so help is highly appreciated).
-- [ ] Try to train the net with data for specific cases and see if will do better for them.
+For windows you either need mingw or hope it works with visual studio cmake generator.
+
+If you did not download and place VST sdk files - VST plugin won't be built.
+
+Compiling for x64:
+```
+cmake -Bbuild-x64 -H.
+cd build-x64
+make 
+```
+
+Compiling for x32:
+```
+cmake -D CMAKE_CXX_FLAGS=-m32 -D CMAKE_C_FLAGS=-m32 -Bbuild-x32 -H.
+cd build-x32
+make
+```
+
+Cross-compiling for Windows x64:
+```
+cmake -Bbuild-mingw64 -H.  -DCMAKE_TOOLCHAIN_FILE=toolchains/toolchain-mingw64.cmake
+cd build-mingw64
+make
+```
 
 ## License
 
