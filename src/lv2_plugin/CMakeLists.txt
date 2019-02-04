@@ -39,3 +39,8 @@ set_target_properties(${LV2_TARGET} PROPERTIES
 
 configure_file(resources/manifest.ttl ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/rnnoise.lv2/manifest.ttl)
 configure_file(resources/rnnoise.ttl ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/rnnoise.lv2/rnnoise.ttl)
+
+install(TARGETS ${LV2_TARGET}
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
