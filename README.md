@@ -8,7 +8,7 @@ The plugin is meant to suppress a wide range of noise origins ([from original pa
 
 From my tests mild background noise is always suppressed, loud sounds, like clicking of mechanical keyboard, are suppressed while there is no voice however they are only reduced in volume when voice is present. 
 
-The plugin is made to work with 1 channel, 16 bit, 48000 Hz audio input. Other sample rates may work, or not...
+The plugin is made to work with 1 channel and/or 2 channels (ladspa plugin), 16 bit, 48000 Hz audio input. Other sample rates may work, or not...
 
 ## How-to
 
@@ -32,7 +32,7 @@ The idea is:
 ```
 pacmd load-module module-null-sink sink_name=mic_denoised_out  
 
-pacmd load-module module-ladspa-sink sink_name=mic_raw_in sink_master=mic_denoised_out label=noise_suppressor plugin=/path/to/librnnoise_ladspa.so
+pacmd load-module module-ladspa-sink sink_name=mic_raw_in sink_master=mic_denoised_out label=noise_suppressor_mono plugin=/path/to/librnnoise_ladspa.so
 
 pacmd load-module module-loopback source=your_mic_name sink=mic_raw_in channels=1
 ```
@@ -43,11 +43,19 @@ This should be executed every time pulse audio is launched. This can be done by 
 .include /etc/pulse/default.pa
 
 load-module module-null-sink sink_name=mic_denoised_out  
-load-module module-ladspa-sink sink_name=mic_raw_in sink_master=mic_denoised_out label=noise_suppressor plugin=/path/to/librnnoise_ladspa.so
+load-module module-ladspa-sink sink_name=mic_raw_in sink_master=mic_denoised_out label=noise_suppressor_mono plugin=/path/to/librnnoise_ladspa.so
 load-module module-loopback source=your_mic_name sink=mic_raw_in channels=1
 
 set-default-source mic_denoised_out.monitor
 ```
+
+For stereo input use:
+
+`label=noise_suppressor_stereo`
+
+and
+
+`channels=2`
 
 You can get `librnnoise_ladspa.so` either by downloading latest release or by compiling it yourself.
 
