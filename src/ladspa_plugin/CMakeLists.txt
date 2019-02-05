@@ -7,8 +7,6 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
-set(PROJECT_ROOT ../../../)
-
 set(LADSPA_INTERFACE_SRC
         ladspa.h
         ladspa++.h)
@@ -21,22 +19,21 @@ set(LADSPA_PLUGIN_SOURCES
         ${LADSPA_INTERFACE_SRC}
         ${LADSPA_IMPL_SRC})
 
-function(build bit)
-    set(LADSPA_TARGET_X${bit} rnnoise_ladspa_x${bit})
+set(LADSPA_TARGET rnnoise_ladspa)
 
-    add_library(${LADSPA_TARGET_X${bit}} SHARED ${LADSPA_PLUGIN_SOURCES})
+add_library(${LADSPA_TARGET} SHARED ${LADSPA_PLUGIN_SOURCES})
 
-    target_link_libraries(${LADSPA_TARGET_X${bit}} RnNoisePluginCommon "-static-libgcc -static-libstdc++ -m${bit}")
+target_link_libraries(${LADSPA_TARGET} RnNoisePluginCommon "-static-libgcc -static-libstdc++")
 
-    set(X${bit}_COMPILE_OPTIONS
-            "-m${bit};"
-            "$<$<CONFIG:RELEASE>:-O3;>")
+set(COMPILE_OPTIONS "$<$<CONFIG:RELEASE>:-O3;>")
 
-    target_compile_options(${LADSPA_TARGET_X${bit}} PRIVATE ${X${bit}_COMPILE_OPTIONS})
+target_compile_options(${LADSPA_TARGET} PRIVATE ${COMPILE_OPTIONS})
 
-    set_target_properties(${LADSPA_TARGET_X${bit}} PROPERTIES
-            LIBRARY_OUTPUT_DIRECTORY "${PROJECT_ROOT}/bin/x${bit}/ladspa")
-endfunction()
+set_target_properties(${LADSPA_TARGET} PROPERTIES
+        LIBRARY_OUTPUT_DIRECTORY "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/ladspa"
+        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/ladspa")
 
-build(32)
-build(64)
+install(TARGETS ${LADSPA_TARGET}
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})

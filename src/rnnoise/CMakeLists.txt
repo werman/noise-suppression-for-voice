@@ -20,10 +20,7 @@ set(RN_NOISE_SRC
         src/kiss_fft.c
         src/pitch.c
         src/rnn.c
-        src/rnn_data.c
-        src/rnnoise_demo.c)
-
-add_executable(rnnoise_demo ${RN_NOISE_SRC})
+        src/rnn_data.c)
 
 add_library(RnNoise STATIC ${RN_NOISE_SRC})
 
@@ -31,9 +28,3 @@ target_include_directories(RnNoise PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
         $<INSTALL_INTERFACE:include>
         PRIVATE src)
-
-install(TARGETS RnNoise
-        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
-install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
