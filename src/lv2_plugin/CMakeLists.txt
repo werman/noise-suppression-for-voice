@@ -27,7 +27,11 @@ set(LV2_TARGET rnnoise_lv2)
 
 add_library(${LV2_TARGET} SHARED ${LV2_PLUGIN_SOURCES})
 
-target_link_libraries(${LV2_TARGET} RnNoisePluginCommon "-static-libgcc -static-libstdc++")
+if (MINGW)
+    target_link_libraries(${VST2_TARGET} "-static-libgcc -static-libstdc++")
+endif()
+
+target_link_libraries(${LV2_TARGET} RnNoisePluginCommon)
 
 set(COMPILE_OPTIONS "$<$<CONFIG:RELEASE>:-O3;>")
 
