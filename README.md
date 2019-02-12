@@ -71,6 +71,12 @@ Useful detailed info about pulseaudio logic [toadjaune/pulseaudio-config](https:
 
 The [thread](https://bugs.freedesktop.org/show_bug.cgi?id=101043) which helped me with how to post-process mic output and make it available to applications.
 
+### MacOS
+
+You will need to compile library yourself following steps below.
+
+It is reported that VST plugin works with Reaper after removing underscore from lib name.
+
 ## Status
 
 The plugin is tested with Equalizer APO v1.2 x64 (open source system-wide equalizer for Windows) and tested with pulse audio on arch linux.
@@ -87,7 +93,9 @@ All improvements are welcomed!
 
 ### Compiling
 
-For windows you either need mingw or hope it works with visual studio cmake generator.
+For Windows you either need mingw or hope it works with visual studio cmake generator.
+
+For MacOS steps are the same as for Linux.
 
 If you did not download and place VST sdk files - VST plugin won't be built.
 
