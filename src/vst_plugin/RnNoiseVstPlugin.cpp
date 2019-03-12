@@ -25,9 +25,15 @@ void RnNoiseVstPlugin::processReplacing(float **inputs, float **outputs, VstInt3
 }
 
 VstInt32 RnNoiseVstPlugin::startProcess() {
+    m_rnNoisePlugin->setSampleRate(static_cast<uint32_t >(getSampleRate()));
     m_rnNoisePlugin->init();
 
     return AudioEffectX::startProcess();
+}
+
+void RnNoiseVstPlugin::resume () {
+    m_rnNoisePlugin->setSampleRate(static_cast<uint32_t >(getSampleRate()));
+    m_rnNoisePlugin->resume();
 }
 
 VstInt32 RnNoiseVstPlugin::stopProcess() {

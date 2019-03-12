@@ -4,9 +4,8 @@
 
 RnNoiseLv2Plugin::RnNoiseLv2Plugin(double sample_rate, const char *bundle_path, const LV2_Feature *const *features,
                                    bool *valid) : Plugin(sample_rate, bundle_path, features, valid) {
-    (*valid) = true;
-
     m_rnNoisePlugin = std::make_unique<RnNoiseCommonPlugin>();
+    (*valid) = m_rnNoisePlugin->setSampleRate(static_cast<uint32_t>(sample_rate));
 }
 
 

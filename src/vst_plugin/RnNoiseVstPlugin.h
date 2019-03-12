@@ -14,7 +14,7 @@ public:
     ~RnNoiseVstPlugin() override;
 
     VstInt32 startProcess() override;
-
+    void resume () override;
     VstInt32 stopProcess() override;
 
     void processReplacing(float **inputs, float **outputs, VstInt32 sampleFrames) override;

@@ -32,7 +32,8 @@ struct RnNoiseMono {
                     nullptr // implementation data
             };
 
-    RnNoiseMono() {
+    RnNoiseMono(sample_rate_t sr) {
+        m_rnNoisePlugin.setSampleRate(sr);
         m_rnNoisePlugin.init();
     }
 
@@ -41,7 +42,6 @@ struct RnNoiseMono {
     }
 
     void run(port_array_t<port_names, port_info> &ports) {
-
 		const_buffer in_buffer = ports.get<port_names::in_1>();
 		buffer out_buffer = ports.get<port_names::out_1>();
 
@@ -82,7 +82,9 @@ struct RnNoiseStereo {
                     nullptr // implementation data
             };
 
-    RnNoiseStereo() {
+    RnNoiseStereo(sample_rate_t sr) {
+        m_rnNoisePluginL.setSampleRate(sr);
+        m_rnNoisePluginR.setSampleRate(sr);
         m_rnNoisePluginL.init();
         m_rnNoisePluginR.init();
     }
