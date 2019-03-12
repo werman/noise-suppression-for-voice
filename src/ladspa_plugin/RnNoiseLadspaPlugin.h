@@ -32,8 +32,9 @@ struct RnNoiseMono {
                     nullptr // implementation data
             };
 
-    RnNoiseMono() {
+    RnNoiseMono(sample_rate_t sr) {
         m_rnNoisePlugin.init();
+        m_rnNoisePlugin.setSampleRate(sr);
     }
 
     ~RnNoiseMono() {
@@ -82,9 +83,11 @@ struct RnNoiseStereo {
                     nullptr // implementation data
             };
 
-    RnNoiseStereo() {
+    RnNoiseStereo(sample_rate_t sr) {
         m_rnNoisePluginL.init();
         m_rnNoisePluginR.init();
+        m_rnNoisePluginL.setSampleRate(sr);
+        m_rnNoisePluginR.setSampleRate(sr);
     }
 
     ~RnNoiseStereo() {

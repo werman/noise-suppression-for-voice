@@ -7,6 +7,7 @@ RnNoiseLv2Plugin::RnNoiseLv2Plugin(double sample_rate, const char *bundle_path, 
     (*valid) = true;
 
     m_rnNoisePlugin = std::make_unique<RnNoiseCommonPlugin>();
+    m_rnNoisePlugin->setSampleRate(sample_rate);
 }
 
 
