@@ -52,7 +52,12 @@ RNNOISE_EXPORT DenoiseState *rnnoise_create();
 
 RNNOISE_EXPORT void rnnoise_destroy(DenoiseState *st);
 
-RNNOISE_EXPORT float rnnoise_process_frame(DenoiseState *st, float *out, const float *in);
+RNNOISE_EXPORT int rnnoise_get_needed(DenoiseState *st);
+
+RNNOISE_EXPORT int rnnoise_add_samples(DenoiseState *st, const float *in, int in_len);
+
+RNNOISE_EXPORT float rnnoise_process_frame(DenoiseState *st, float *out);
+
 
 #ifdef __cplusplus
 }

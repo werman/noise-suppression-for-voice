@@ -85,6 +85,9 @@ typedef struct {
 } CommonState;
 
 struct DenoiseState {
+  float input[FRAME_SIZE];
+  int   input_pos;
+
   float analysis_mem[FRAME_SIZE];
   float cepstral_mem[CEPS_MEM][NB_BANDS];
   int memid;
@@ -469,11 +472,27 @@ void pitch_filter(kiss_fft_cpx *X, const kiss_fft_cpx *P, const float *Ex, const
   }
 }
 
-float rnnoise_process_frame(DenoiseState *st, float *out, const float *in) {
+int rnnoise_get_needed(DenoiseState *st) {
+  return FRAME_SIZE - st->input_pos;
+}
+
+int rnnoise_add_samples(DenoiseState *st, const float *in, int in_len) {
+  static const float a_hp[2] = {-1.99599, 0.99600};
+  static const float b_hp[2] = {-2, 1};
+
+  const int needed = FRAME_SIZE - st->input_pos;
+  const int take   = needed > in_len ? in_len : needed;
+
+  biquad(st->input + st->input_pos, st->mem_hp_x, in, b_hp, a_hp, take);
+  st->input_pos += take;
+
+  return take;
+}
+
+float rnnoise_process_frame(DenoiseState *st, float *out) {
   int i;
   kiss_fft_cpx X[FREQ_SIZE];
   kiss_fft_cpx P[WINDOW_SIZE];
-  float x[FRAME_SIZE];
   float Ex[NB_BANDS], Ep[NB_BANDS];
   float Exp[NB_BANDS];
   float features[NB_FEATURES];
@@ -481,10 +500,9 @@ float rnnoise_process_frame(DenoiseState *st, float *out, const float *in) {
   float gf[FREQ_SIZE]={1};
   float vad_prob = 0;
   int silence;
-  static const float a_hp[2] = {-1.99599, 0.99600};
-  static const float b_hp[2] = {-2, 1};
-  biquad(x, st->mem_hp_x, in, b_hp, a_hp, FRAME_SIZE);
-  silence = compute_frame_features(st, X, P, Ex, Ep, Exp, features, x);
+
+  silence = compute_frame_features(st, X, P, Ex, Ep, Exp, features, st->input);
+  st->input_pos = 0;
 
   if (!silence) {
     compute_rnn(&st->rnn, g, &vad_prob, features);
