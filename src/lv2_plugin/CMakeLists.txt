@@ -28,7 +28,7 @@ set(LV2_TARGET rnnoise_lv2)
 add_library(${LV2_TARGET} SHARED ${LV2_PLUGIN_SOURCES})
 
 if (MINGW)
-    target_link_libraries(${LV2_TARGET} "-static-libgcc -static-libstdc++")
+    target_link_libraries(${LV2_TARGET} ${MINGW_ADDITIONAL_LINKING_FLAGS})
 endif()
 
 target_link_libraries(${LV2_TARGET} RnNoisePluginCommon)
