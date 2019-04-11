@@ -38,7 +38,7 @@ set(VST2_TARGET rnnoise_vst)
 add_library(${VST2_TARGET} SHARED ${VST2_PLUGIN_SRC})
 
 if (MINGW)
-    target_link_libraries(${VST2_TARGET} "-static-libgcc -static-libstdc++")
+    target_link_libraries(${VST2_TARGET} ${MINGW_ADDITIONAL_LINKING_FLAGS})
 endif()
 
 target_link_libraries(${VST2_TARGET} RnNoisePluginCommon)

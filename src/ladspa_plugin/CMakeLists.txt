@@ -24,7 +24,7 @@ set(LADSPA_TARGET rnnoise_ladspa)
 add_library(${LADSPA_TARGET} SHARED ${LADSPA_PLUGIN_SOURCES})
 
 if (MINGW)
-    target_link_libraries(${LADSPA_TARGET} "-static-libgcc -static-libstdc++")
+    target_link_libraries(${LADSPA_TARGET} ${MINGW_ADDITIONAL_LINKING_FLAGS})
 endif()
 
 target_link_libraries(${LADSPA_TARGET} RnNoisePluginCommon)
