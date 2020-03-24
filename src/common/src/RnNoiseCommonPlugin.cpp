@@ -7,7 +7,12 @@
 
 #include <rnnoise/rnnoise.h>
 
-#define VAD_PROB_THRESHOLD 0.9
+#define VAD_PROB_THRESHOLD 0.95
+// the amount of samples that aren't silenced,
+// irregardless of rnnoise's VAD result, after one was detected.
+// this fixes cut outs in the middle of words
+// each sample is 10ms. 
+#define VAD_GRACE_PERIOD 20
 
 void RnNoiseCommonPlugin::init() {
     deinit();
@@ -37,7 +42,12 @@ void RnNoiseCommonPlugin::process(const float *in, float *out, int32_t sampleFra
 
         float vad_prob = rnnoise_process_frame(m_denoiseState.get(), out, &m_inputBuffer[0]);
 
-        if (vad_prob > VAD_PROB_THRESHOLD ) {
+        if (vad_prob >= VAD_PROB_THRESHOLD ) {
+            m_remaining_grace_period = VAD_GRACE_PERIOD;
+        }
+
+        if (m_remaining_grace_period > 0) {
+            m_remaining_grace_period--;
             for (size_t i = 0; i < sampleFrames; i++) {
                 out[i] /= std::numeric_limits<short>::max();
             }
@@ -72,8 +82,12 @@ void RnNoiseCommonPlugin::process(const float *in, float *out, int32_t sampleFra
                 float *currentInBuffer = &m_inputBuffer[i * k_denoiseFrameSize];
                 float vad_prob = rnnoise_process_frame(m_denoiseState.get(), currentOutBuffer, currentInBuffer);
 
+                if (vad_prob >= VAD_PROB_THRESHOLD ) {
+                    m_remaining_grace_period = VAD_GRACE_PERIOD;
+                }
 
-                if (vad_prob > VAD_PROB_THRESHOLD) {
+                if (m_remaining_grace_period > 0) {
+                    m_remaining_grace_period--;
                     for (size_t j = 0; j < k_denoiseFrameSize; j++) {
                         currentOutBuffer[j] /= std::numeric_limits<short>::max();
                     }
