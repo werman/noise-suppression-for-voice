@@ -7,6 +7,8 @@
 
 #include <rnnoise/rnnoise.h>
 
+#define VAD_PROB_THRESHOLD 0.9
+
 void RnNoiseCommonPlugin::init() {
     deinit();
     createDenoiseState();
@@ -33,11 +35,18 @@ void RnNoiseCommonPlugin::process(const float *in, float *out, int32_t sampleFra
             m_inputBuffer[i] = in[i] * std::numeric_limits<short>::max();
         }
 
-        rnnoise_process_frame(m_denoiseState.get(), out, &m_inputBuffer[0]);
+        float vad_prob = rnnoise_process_frame(m_denoiseState.get(), out, &m_inputBuffer[0]);
 
-        for (size_t i = 0; i < sampleFrames; i++) {
-            out[i] /= std::numeric_limits<short>::max();
+        if (vad_prob > VAD_PROB_THRESHOLD ) {
+            for (size_t i = 0; i < sampleFrames; i++) {
+                out[i] /= std::numeric_limits<short>::max();
+            }
+        } else {
+            for (size_t i = 0; i < sampleFrames; i++) {
+                out[i] = 0.f;
+            }
         }
+
     } else {
         m_inputBuffer.resize(m_inputBuffer.size() + sampleFrames);
 
@@ -61,10 +70,17 @@ void RnNoiseCommonPlugin::process(const float *in, float *out, int32_t sampleFra
             for (size_t i = 0; i < samplesToProcess; i++) {
                 float *currentOutBuffer = &outBufferWriteStart[i * k_denoiseFrameSize];
                 float *currentInBuffer = &m_inputBuffer[i * k_denoiseFrameSize];
-                rnnoise_process_frame(m_denoiseState.get(), currentOutBuffer, currentInBuffer);
+                float vad_prob = rnnoise_process_frame(m_denoiseState.get(), currentOutBuffer, currentInBuffer);
 
-                for (size_t j = 0; j < k_denoiseFrameSize; j++) {
-                    currentOutBuffer[j] /= std::numeric_limits<short>::max();
+
+                if (vad_prob > VAD_PROB_THRESHOLD) {
+                    for (size_t j = 0; j < k_denoiseFrameSize; j++) {
+                        currentOutBuffer[j] /= std::numeric_limits<short>::max();
+                    }
+                } else {
+                    for (size_t j = 0; j < k_denoiseFrameSize; j++) {
+                        currentOutBuffer[j] = 0.f;
+                    }
                 }
             }
         }
