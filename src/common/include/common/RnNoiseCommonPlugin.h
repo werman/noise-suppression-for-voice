@@ -24,6 +24,8 @@ private:
 
     std::shared_ptr<DenoiseState> m_denoiseState;
 
+    short m_remaining_grace_period = 0;
+
     std::vector<float> m_inputBuffer;
     std::vector<float> m_outputBuffer;
 };
