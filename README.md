@@ -22,6 +22,8 @@ To enable the plugin in Equalizer APO select "Plugins" -> "VST Plugin" and speci
 
 #### Pulseaudio
 
+> To ease and enhance this module integration with Pulseaudio, [please upvote this PA feature request](https://gitlab.freedesktop.org/pulseaudio/pulseaudio/-/issues/120).
+
 The idea is:
 
 - Create a sink from which apps will take audio later and which will be the end think in the chain.
