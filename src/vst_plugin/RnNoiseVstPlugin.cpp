@@ -21,7 +21,7 @@ void RnNoiseVstPlugin::processReplacing(float **inputs, float **outputs, VstInt3
     float *inChannel0 = inputs[0];
     float *outChannel0 = outputs[0];
 
-    m_rnNoisePlugin->process(inChannel0, outChannel0, sampleFrames);
+    m_rnNoisePlugin->process(inChannel0, outChannel0, sampleFrames, 0);
 }
 
 VstInt32 RnNoiseVstPlugin::startProcess() {

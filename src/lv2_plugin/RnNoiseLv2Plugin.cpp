@@ -39,7 +39,7 @@ void RnNoiseLv2Plugin::run(uint32_t sample_count) {
     PluginBase::run(sample_count);
 
     if (m_inPort != nullptr && m_outPort != nullptr) {
-        m_rnNoisePlugin->process(m_inPort, m_outPort, sample_count);
+        m_rnNoisePlugin->process(m_inPort, m_outPort, sample_count, 0);
     }
 }
 

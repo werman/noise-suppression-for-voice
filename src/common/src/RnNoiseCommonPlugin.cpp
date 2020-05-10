@@ -4,15 +4,9 @@
 #include <ios>
 #include <limits>
 #include <algorithm>
+#include <cassert>
 
 #include <rnnoise/rnnoise.h>
-
-#define VAD_PROB_THRESHOLD 0.95
-// the amount of samples that aren't silenced,
-// irregardless of rnnoise's VAD result, after one was detected.
-// this fixes cut outs in the middle of words
-// each sample is 10ms. 
-#define VAD_GRACE_PERIOD 20
 
 void RnNoiseCommonPlugin::init() {
     deinit();
@@ -23,7 +17,9 @@ void RnNoiseCommonPlugin::deinit() {
     m_denoiseState.reset();
 }
 
-void RnNoiseCommonPlugin::process(const float *in, float *out, int32_t sampleFrames) {
+void RnNoiseCommonPlugin::process(const float *in, float *out, int32_t sampleFrames, float vadThreshold) {
+    assert(vadThreshold >= 0.f && vadThreshold <= 1.f);
+
     if (sampleFrames == 0) {
         return;
     }
@@ -40,14 +36,14 @@ void RnNoiseCommonPlugin::process(const float *in, float *out, int32_t sampleFra
             m_inputBuffer[i] = in[i] * std::numeric_limits<short>::max();
         }
 
-        float vad_prob = rnnoise_process_frame(m_denoiseState.get(), out, &m_inputBuffer[0]);
+        float vadProbability = rnnoise_process_frame(m_denoiseState.get(), out, &m_inputBuffer[0]);
 
-        if (vad_prob >= VAD_PROB_THRESHOLD ) {
-            m_remaining_grace_period = VAD_GRACE_PERIOD;
+        if (vadProbability >= vadThreshold) {
+            m_remainingGracePeriod = k_vadGracePeriodSamples;
         }
 
-        if (m_remaining_grace_period > 0) {
-            m_remaining_grace_period--;
+        if (m_remainingGracePeriod > 0) {
+            m_remainingGracePeriod--;
             for (size_t i = 0; i < sampleFrames; i++) {
                 out[i] /= std::numeric_limits<short>::max();
             }
@@ -80,14 +76,14 @@ void RnNoiseCommonPlugin::process(const float *in, float *out, int32_t sampleFra
             for (size_t i = 0; i < samplesToProcess; i++) {
                 float *currentOutBuffer = &outBufferWriteStart[i * k_denoiseFrameSize];
                 float *currentInBuffer = &m_inputBuffer[i * k_denoiseFrameSize];
-                float vad_prob = rnnoise_process_frame(m_denoiseState.get(), currentOutBuffer, currentInBuffer);
+                float vadProbability = rnnoise_process_frame(m_denoiseState.get(), currentOutBuffer, currentInBuffer);
 
-                if (vad_prob >= VAD_PROB_THRESHOLD ) {
-                    m_remaining_grace_period = VAD_GRACE_PERIOD;
+                if (vadProbability >= vadThreshold) {
+                    m_remainingGracePeriod = k_vadGracePeriodSamples;
                 }
 
-                if (m_remaining_grace_period > 0) {
-                    m_remaining_grace_period--;
+                if (m_remainingGracePeriod > 0) {
+                    m_remainingGracePeriod--;
                     for (size_t j = 0; j < k_denoiseFrameSize; j++) {
                         currentOutBuffer[j] /= std::numeric_limits<short>::max();
                     }
