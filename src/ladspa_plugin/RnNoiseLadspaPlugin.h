@@ -5,10 +5,25 @@
 
 using namespace ladspa;
 
+namespace port_info_custom {
+    constexpr static port_info_t vad_threshold_input = {
+            "VAD Threshold (%)",
+            "If probability of sound being a voice is lower than this threshold - silence will be returned",
+            port_types::input | port_types::control,
+            {
+                    port_hints::bounded_below | port_hints::bounded_above | port_hints::integer |
+                    port_hints::default_low,
+                    0.f,
+                    99.f
+            }
+    };
+}
+
 struct RnNoiseMono {
     enum class port_names {
         in_1,
         out_1,
+        in_vad_threshold,
         size
     };
 
@@ -16,6 +31,7 @@ struct RnNoiseMono {
             {
                     port_info_common::audio_input,
                     port_info_common::audio_output,
+                    port_info_custom::vad_threshold_input,
                     port_info_common::final_port
             };
 
@@ -41,11 +57,13 @@ struct RnNoiseMono {
     }
 
     void run(port_array_t<port_names, port_info> &ports) {
+        const_buffer in_buffer = ports.get<port_names::in_1>();
+        buffer out_buffer = ports.get<port_names::out_1>();
+        uint32_t vad_threshold = ports.get<port_names::in_vad_threshold>();
 
-		const_buffer in_buffer = ports.get<port_names::in_1>();
-		buffer out_buffer = ports.get<port_names::out_1>();
+        float vad_threshold_normalized = std::max(std::min(vad_threshold / 100.f, 0.99f), 0.f);
 
-        m_rnNoisePlugin.process(in_buffer.data(), out_buffer.data(), in_buffer.size());
+        m_rnNoisePlugin.process(in_buffer.data(), out_buffer.data(), in_buffer.size(), vad_threshold_normalized);
     }
 
     RnNoiseCommonPlugin m_rnNoisePlugin;
@@ -57,6 +75,7 @@ struct RnNoiseStereo {
         in_r,
         out_1,
         out_r,
+        in_vad_threshold,
         size
     };
 
@@ -66,6 +85,7 @@ struct RnNoiseStereo {
                     port_info_common::audio_input_r,
                     port_info_common::audio_output_l,
                     port_info_common::audio_output_r,
+                    port_info_custom::vad_threshold_input,
                     port_info_common::final_port
             };
 
@@ -99,8 +119,12 @@ struct RnNoiseStereo {
         buffer out_buffer_l = ports.get<port_names::out_1>();
         buffer out_buffer_r = ports.get<port_names::out_r>();
 
-        m_rnNoisePluginL.process(in_buffer_l.data(), out_buffer_l.data(), in_buffer_l.size());
-        m_rnNoisePluginR.process(in_buffer_r.data(), out_buffer_r.data(), in_buffer_r.size());
+        uint32_t vad_threshold = ports.get<port_names::in_vad_threshold>();
+
+        float vad_threshold_normalized = std::max(std::min(vad_threshold / 100.f, 0.99f), 0.f);
+
+        m_rnNoisePluginL.process(in_buffer_l.data(), out_buffer_l.data(), in_buffer_l.size(), vad_threshold_normalized);
+        m_rnNoisePluginR.process(in_buffer_r.data(), out_buffer_r.data(), in_buffer_r.size(), vad_threshold_normalized);
     }
 
     RnNoiseCommonPlugin m_rnNoisePluginL;
