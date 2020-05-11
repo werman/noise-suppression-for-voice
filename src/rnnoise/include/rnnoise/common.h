@@ -6,6 +6,17 @@
 #include "stdlib.h"
 #include "string.h"
 
+#if !defined(alloca)
+#   if defined(__GLIBC__) || defined(__sun) || defined(__APPLE__) || defined(__NEWLIB__)
+#       include <alloca.h>
+#   elif defined(_WIN32)
+#       include <malloc.h>
+#       if !defined(alloca)
+#           define alloca _alloca
+#       endif
+#   endif
+#endif
+
 #define RNN_INLINE inline
 #define OPUS_INLINE inline
 
