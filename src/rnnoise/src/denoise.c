@@ -31,6 +31,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+
+#define _USE_MATH_DEFINES
 #include <math.h>
 
 #include "rnnoise/kiss_fft.h"
