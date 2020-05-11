@@ -58,7 +58,7 @@ void RnNoiseCommonPlugin::process(const float *in, float *out, int32_t sampleFra
 
         // From [-1.f,1.f] range to [min short, max short] range which rnnoise lib will understand
         {
-            float *inputBufferWriteStart = (m_inputBuffer.end() - sampleFrames).base();
+            float *inputBufferWriteStart = &(*(m_inputBuffer.end() - sampleFrames));
             for (size_t i = 0; i < sampleFrames; i++) {
                 inputBufferWriteStart[i] = in[i] * std::numeric_limits<short>::max();
             }
@@ -71,7 +71,7 @@ void RnNoiseCommonPlugin::process(const float *in, float *out, int32_t sampleFra
 
         // Process input buffer by chunks of k_denoiseFrameSize, put result into out buffer to return into range [-1.f,1.f]
         {
-            float *outBufferWriteStart = (m_outputBuffer.end() - framesToProcess).base();
+            float *outBufferWriteStart = &(*(m_outputBuffer.end() - framesToProcess));
 
             for (size_t i = 0; i < samplesToProcess; i++) {
                 float *currentOutBuffer = &outBufferWriteStart[i * k_denoiseFrameSize];
