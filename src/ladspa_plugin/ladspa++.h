@@ -1,6 +1,6 @@
 /*************************************************************************/
 /* ladspa++ - A C++ wrapper for ladspa                                   */
-/* Copyright (C) 2014                                                    */
+/* Copyright (C) 2014-2018                                               */
 /* Johannes Lorenz                                                       */
 /* https://github.com/JohannesLorenz/                                    */
 /*                                                                       */
@@ -415,23 +415,23 @@ namespace ladspa
     {
         constexpr static port_info_t audio_input = {
                 "Input", "Effect's audio input (mono).",
-                port_types::input | port_types::audio };
+                port_types::input | port_types::audio, {0,0,0} };
         constexpr static port_info_t audio_input_l = {
                 "Input (L)", "Effect's audio input (left).",
-                port_types::input | port_types::audio };
+                port_types::input | port_types::audio, {0,0,0} };
         constexpr static port_info_t audio_input_r = {
                 "Input (R)", "Effect's audio input (right).",
-                port_types::input | port_types::audio };
+                port_types::input | port_types::audio, {0,0,0} };
 
         constexpr static port_info_t audio_output = {
                 "Output", "Effect's audio output (mono).",
-                port_types::output | port_types::audio };
+                port_types::output | port_types::audio, {0,0,0} };
         constexpr static port_info_t audio_output_l = {
                 "Output (L)", "Effect's audio output (mono).",
-                port_types::output | port_types::audio };
+                port_types::output | port_types::audio, {0,0,0} };
         constexpr static port_info_t audio_output_r = {
                 "Output (R)", "Effect's audio output (right).",
-                port_types::output | port_types::audio };
+                port_types::output | port_types::audio, {0,0,0} };
 
         // more ports can be added on request...
 
@@ -835,7 +835,7 @@ namespace ladspa
  * @brief A class that sets up everything for the C ladpsa side.
  *
  * This includes the static descriptions, port buffers and callbacks.
- * You do not use this class, please use the collection class instead.
+ * Don't use this class directly, please use the collection class instead.
  */
     template<class Plugin>
     class builder
@@ -892,11 +892,11 @@ namespace ladspa
             //	_ports.set_caller(_port, _data_location);
         }
 
-        template<int i>
-        struct criterium_is_buffer
-        {
-            constexpr static bool value = port_info[i].descriptor.is(port_types::audio);
-        };
+/*	template<int i>
+	struct criterium_is_buffer
+	{
+		constexpr static bool value = port_info[i].descriptor.is(port_types::audio);
+	};*/
 
         //void _activate(LADSPA_Handle Instance);
         static void _run(LADSPA_Handle _instance,
@@ -979,7 +979,7 @@ namespace ladspa
 /**
  * @brief This is for a collection of your plugin types.
  *
- * it helps you to select the correct descriptor at runtime.
+ * it helps you to select the correct LADSPA descriptor at runtime.
  */
     template<class ...Args>
     class collection

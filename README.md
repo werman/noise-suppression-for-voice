@@ -32,7 +32,7 @@ The idea is:
 ```
 pacmd load-module module-null-sink sink_name=mic_denoised_out  
 
-pacmd load-module module-ladspa-sink sink_name=mic_raw_in sink_master=mic_denoised_out label=noise_suppressor_mono plugin=/path/to/librnnoise_ladspa.so
+pacmd load-module module-ladspa-sink sink_name=mic_raw_in sink_master=mic_denoised_out label=noise_suppressor_mono plugin=/path/to/librnnoise_ladspa.so control=50
 
 pacmd load-module module-loopback source=your_mic_name sink=mic_raw_in channels=1
 ```
@@ -43,7 +43,7 @@ This should be executed every time pulse audio is launched. This can be done by 
 .include /etc/pulse/default.pa
 
 load-module module-null-sink sink_name=mic_denoised_out  
-load-module module-ladspa-sink sink_name=mic_raw_in sink_master=mic_denoised_out label=noise_suppressor_mono plugin=/path/to/librnnoise_ladspa.so
+load-module module-ladspa-sink sink_name=mic_raw_in sink_master=mic_denoised_out label=noise_suppressor_mono plugin=/path/to/librnnoise_ladspa.so control=50
 load-module module-loopback source=your_mic_name sink=mic_raw_in channels=1
 
 set-default-source mic_denoised_out.monitor
@@ -66,6 +66,15 @@ pacmd list-sources
 ```
 
 You may still need to set correct input for application, this can be done in audio mixer panel (if you have one) in 'Recording' tab where you should set 'Monitor of Null Output' as source.
+
+Plugin settings:
+
+- VAD Threshold (%) - if probability of sound being a voice is lower than this threshold - silence will be returned.
+
+By default VAD threshold is 50% which should work with any mic. For most mics higher threshold `control=95` would be fine.
+Without the VAD some loud noises may still be a little bit audible when there is no voice.
+
+There is also an implicit grace period of 200 milliseconds, meaning that after the last voice detection - output won't be silenced for 200 ms.
 
 Useful detailed info about pulseaudio logic [toadjaune/pulseaudio-config](https://github.com/toadjaune/pulseaudio-config).
 

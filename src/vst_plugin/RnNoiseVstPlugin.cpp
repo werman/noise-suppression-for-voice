@@ -2,7 +2,7 @@
 
 #include "common/RnNoiseCommonPlugin.h"
 
-const char *RnNoiseVstPlugin::s_programName = "Noise Suppression Stereo";
+const char *RnNoiseVstPlugin::s_programName = "Noise Suppression";
 
 RnNoiseVstPlugin::RnNoiseVstPlugin(audioMasterCallback audioMaster, VstInt32 numPrograms, VstInt32 numParams)
         : AudioEffectX(audioMaster, numPrograms, numParams) {
@@ -26,8 +26,8 @@ void RnNoiseVstPlugin::processReplacing(float **inputs, float **outputs, VstInt3
     float *outChannel1 = outputs[1];
 
     // TODO can it be improved by considering both channels as correlated?
-    m_rnNoisePlugin0->process(inChannel0, outChannel0, sampleFrames);
-    m_rnNoisePlugin1->process(inChannel1, outChannel1, sampleFrames);
+    m_rnNoisePlugin0->process(inChannel0, outChannel0, sampleFrames, param_vadThreshold);
+    m_rnNoisePlugin1->process(inChannel1, outChannel1, sampleFrames, param_vadThreshold);
 }
 
 VstInt32 RnNoiseVstPlugin::startProcess() {
@@ -49,5 +49,49 @@ void RnNoiseVstPlugin::getProgramName(char *name) {
 }
 
 extern AudioEffect *createEffectInstance(audioMasterCallback audioMaster) {
-    return new RnNoiseVstPlugin(audioMaster, 0, 0);
+    return new RnNoiseVstPlugin(audioMaster, 0, NUM_PARAMS);
+}
+
+void RnNoiseVstPlugin::getParameterLabel(VstInt32 index, char* label) {
+    switch (index) {
+        case PARAM_VAD_THRESHOLD:
+            strcpy(label, param_vadThreshold_label);
+            break;
+    }
+}
+
+void RnNoiseVstPlugin::getParameterName(VstInt32 index, char* label) {
+    switch (index) {
+        case PARAM_VAD_THRESHOLD:
+            strcpy(label, param_vadThreshold_name);
+            break;
+    }
+}
+
+void RnNoiseVstPlugin::getParameterDisplay(VstInt32 index, char* label) {
+    const char* formatStr = "%.3f";
+    int bufferLength = 6; // The length of the value expressed with formatStr
+    char buffer [bufferLength];
+    switch (index) {
+        case PARAM_VAD_THRESHOLD:
+            snprintf(buffer, bufferLength, formatStr, param_vadThreshold);
+            break;
+    }
+    strcpy(label, buffer);
+}
+
+float RnNoiseVstPlugin::getParameter(VstInt32 index) {
+    switch (index) {
+        case PARAM_VAD_THRESHOLD: return param_vadThreshold;
+    }
+    return 1;
+}
+
+void RnNoiseVstPlugin::setParameter(VstInt32 index, float value) {
+    switch (index)
+    {
+        case PARAM_VAD_THRESHOLD:
+            param_vadThreshold = value;
+            break;
+    }
 }

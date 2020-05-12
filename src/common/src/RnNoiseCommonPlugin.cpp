@@ -4,6 +4,7 @@
 #include <ios>
 #include <limits>
 #include <algorithm>
+#include <cassert>
 
 #include <rnnoise/rnnoise.h>
 
@@ -16,7 +17,9 @@ void RnNoiseCommonPlugin::deinit() {
     m_denoiseState.reset();
 }
 
-void RnNoiseCommonPlugin::process(const float *in, float *out, int32_t sampleFrames) {
+void RnNoiseCommonPlugin::process(const float *in, float *out, int32_t sampleFrames, float vadThreshold) {
+    assert(vadThreshold >= 0.f && vadThreshold <= 1.f);
+
     if (sampleFrames == 0) {
         return;
     }
@@ -33,17 +36,29 @@ void RnNoiseCommonPlugin::process(const float *in, float *out, int32_t sampleFra
             m_inputBuffer[i] = in[i] * std::numeric_limits<short>::max();
         }
 
-        rnnoise_process_frame(m_denoiseState.get(), out, &m_inputBuffer[0]);
+        float vadProbability = rnnoise_process_frame(m_denoiseState.get(), out, &m_inputBuffer[0]);
 
-        for (size_t i = 0; i < sampleFrames; i++) {
-            out[i] /= std::numeric_limits<short>::max();
+        if (vadProbability >= vadThreshold) {
+            m_remainingGracePeriod = k_vadGracePeriodSamples;
         }
+
+        if (m_remainingGracePeriod > 0) {
+            m_remainingGracePeriod--;
+            for (size_t i = 0; i < sampleFrames; i++) {
+                out[i] /= std::numeric_limits<short>::max();
+            }
+        } else {
+            for (size_t i = 0; i < sampleFrames; i++) {
+                out[i] = 0.f;
+            }
+        }
+
     } else {
         m_inputBuffer.resize(m_inputBuffer.size() + sampleFrames);
 
         // From [-1.f,1.f] range to [min short, max short] range which rnnoise lib will understand
         {
-            float *inputBufferWriteStart = (m_inputBuffer.end() - sampleFrames).base();
+            float *inputBufferWriteStart = &(*(m_inputBuffer.end() - sampleFrames));
             for (size_t i = 0; i < sampleFrames; i++) {
                 inputBufferWriteStart[i] = in[i] * std::numeric_limits<short>::max();
             }
@@ -56,15 +71,26 @@ void RnNoiseCommonPlugin::process(const float *in, float *out, int32_t sampleFra
 
         // Process input buffer by chunks of k_denoiseFrameSize, put result into out buffer to return into range [-1.f,1.f]
         {
-            float *outBufferWriteStart = (m_outputBuffer.end() - framesToProcess).base();
+            float *outBufferWriteStart = &(*(m_outputBuffer.end() - framesToProcess));
 
             for (size_t i = 0; i < samplesToProcess; i++) {
                 float *currentOutBuffer = &outBufferWriteStart[i * k_denoiseFrameSize];
                 float *currentInBuffer = &m_inputBuffer[i * k_denoiseFrameSize];
-                rnnoise_process_frame(m_denoiseState.get(), currentOutBuffer, currentInBuffer);
+                float vadProbability = rnnoise_process_frame(m_denoiseState.get(), currentOutBuffer, currentInBuffer);
 
-                for (size_t j = 0; j < k_denoiseFrameSize; j++) {
-                    currentOutBuffer[j] /= std::numeric_limits<short>::max();
+                if (vadProbability >= vadThreshold) {
+                    m_remainingGracePeriod = k_vadGracePeriodSamples;
+                }
+
+                if (m_remainingGracePeriod > 0) {
+                    m_remainingGracePeriod--;
+                    for (size_t j = 0; j < k_denoiseFrameSize; j++) {
+                        currentOutBuffer[j] /= std::numeric_limits<short>::max();
+                    }
+                } else {
+                    for (size_t j = 0; j < k_denoiseFrameSize; j++) {
+                        currentOutBuffer[j] = 0.f;
+                    }
                 }
             }
         }

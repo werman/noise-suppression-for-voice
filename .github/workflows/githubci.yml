@@ -1,0 +1,45 @@
+name: CMake Build Matrix
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    name: ${{ matrix.config.name }}
+    runs-on: ${{ matrix.config.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+#          MSVC compiler 16.5.0+d4cbfca49 crashes with:
+#            ladspa++.h(655,1): fatal error C1001: Internal compiler error.
+#
+#          - {
+#            name: "Windows Latest MSVC",
+#            os: windows-latest,
+#            cc: "cl", cxx: "cl",
+#            environment_script: "C:/Program Files (x86)/Microsoft Visual Studio/2019/Enterprise/VC/Auxiliary/Build/vcvars64.bat"
+#          }
+          - {
+            name: "Ubuntu Latest GCC",
+            os: ubuntu-latest,
+            cc: "gcc", cxx: "g++"
+          }
+          - {
+            name: "macOS Latest Clang",
+            os: macos-latest,
+            cc: "clang", cxx: "clang++"
+          }
+
+    steps:
+      - uses: actions/checkout@v1
+
+      - name: Configure
+        env:
+          CC: ${{ matrix.config.cc }}
+          CXX: ${{ matrix.config.cxx }}
+        run: |
+          cmake -Bbuild -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: |
+          cmake --build build
