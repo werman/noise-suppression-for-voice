@@ -21,7 +21,7 @@ void RnNoiseVstPlugin::processReplacing(float **inputs, float **outputs, VstInt3
     float *inChannel0 = inputs[0];
     float *outChannel0 = outputs[0];
 
-    m_rnNoisePlugin->process(inChannel0, outChannel0, sampleFrames, 0);
+    m_rnNoisePlugin->process(inChannel0, outChannel0, sampleFrames, paramVadThreshold);
 }
 
 VstInt32 RnNoiseVstPlugin::startProcess() {
@@ -41,5 +41,55 @@ void RnNoiseVstPlugin::getProgramName(char *name) {
 }
 
 extern AudioEffect *createEffectInstance(audioMasterCallback audioMaster) {
-    return new RnNoiseVstPlugin(audioMaster, 0, 0);
+    return new RnNoiseVstPlugin(audioMaster, 0, RnNoiseVstPlugin::numParameters);
+}
+
+void RnNoiseVstPlugin::getParameterLabel(VstInt32 index, char* label) {
+    const auto paramIdx = static_cast<Parameters>(index);
+    switch (paramIdx) {
+        case Parameters::vadThreshold:
+            strcpy(label, paramVadThresholdLabel);
+            break;
+    }
+}
+
+void RnNoiseVstPlugin::getParameterName(VstInt32 index, char* label) {
+    const auto paramIdx = static_cast<Parameters>(index);
+    switch (paramIdx) {
+        case Parameters::vadThreshold:
+            strcpy(label, paramVadThresholdName);
+            break;
+    }
+}
+
+void RnNoiseVstPlugin::getParameterDisplay(VstInt32 index, char* label) {
+    const char* formatStr = "%.3f";
+    int bufferLength = 6; // The length of the value expressed with formatStr
+    char buffer [bufferLength];
+    
+    const auto paramIdx = static_cast<Parameters>(index);
+    switch (paramIdx) {
+        case Parameters::vadThreshold:
+            snprintf(buffer, bufferLength, formatStr, paramVadThreshold);
+            break;
+    }
+    strcpy(label, buffer);
+}
+
+float RnNoiseVstPlugin::getParameter(VstInt32 index) {
+    const auto paramIdx = static_cast<Parameters>(index);
+    switch (paramIdx) {
+        case Parameters::vadThreshold: return paramVadThreshold;
+    }
+    return 1;
+}
+
+void RnNoiseVstPlugin::setParameter(VstInt32 index, float value) {
+    const auto paramIdx = static_cast<Parameters>(index);
+    switch (paramIdx)
+    {
+        case Parameters::vadThreshold:
+            paramVadThreshold = value;
+            break;
+    }
 }
