@@ -41,7 +41,7 @@ private:
     };    
     
     // Parameter: VAD Threshold
-    const char* paramVadThresholdLabel = "Voice Activity Detection Threshold";
+    const char* paramVadThresholdLabel = "";
     const char* paramVadThresholdName = "VAD Threshold";
     float paramVadThreshold;
 
