@@ -43,7 +43,7 @@ private:
     // Parameter: VAD Threshold
     const char* paramVadThresholdLabel = "";
     const char* paramVadThresholdName = "VAD Threshold";
-    float paramVadThreshold;
+    float paramVadThreshold{0.f};
 
     std::unique_ptr<RnNoiseCommonPlugin> m_rnNoisePlugin;
 };
