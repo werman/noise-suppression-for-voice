@@ -63,17 +63,12 @@ void RnNoiseVstPlugin::getParameterName(VstInt32 index, char* label) {
 }
 
 void RnNoiseVstPlugin::getParameterDisplay(VstInt32 index, char* label) {
-    const char* formatStr = "%.3f";
-    int bufferLength = 6; // The length of the value expressed with formatStr
-    char buffer [bufferLength];
-    
     const auto paramIdx = static_cast<Parameters>(index);
     switch (paramIdx) {
         case Parameters::vadThreshold:
-            snprintf(buffer, bufferLength, formatStr, paramVadThreshold);
+            snprintf(label, VstStringConstants::kVstMaxParamStrLen, "%.3f", paramVadThreshold);
             break;
     }
-    strcpy(label, buffer);
 }
 
 float RnNoiseVstPlugin::getParameter(VstInt32 index) {
