@@ -21,6 +21,7 @@
 #include <tuple>
 #include <array>
 #include <cassert>
+#include <cstdint>
 
 #include "ladspa.h"
 
@@ -172,19 +173,19 @@ namespace ladspa
         template <std::size_t Type>
         struct id_in_list<Type>
         {
-            static constexpr size_t value = -1;
+            static constexpr std::size_t value = -1;
         };
 
         template <std::size_t Type, std::size_t ... Others>
         struct id_in_list<Type, Type, Others...>
         {
-            static constexpr size_t value = 0;
+            static constexpr std::size_t value = 0;
         };
 
         template <std::size_t Type, std::size_t First, std::size_t ... Others>
         struct id_in_list<Type, First, Others...>
         {
-            static constexpr size_t value
+            static constexpr std::size_t value
                     = id_in_list<Type, Others...>::value + 1;
         };
 
