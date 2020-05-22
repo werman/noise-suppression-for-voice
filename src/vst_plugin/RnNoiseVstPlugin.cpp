@@ -1,5 +1,7 @@
 #include "RnNoiseVstPlugin.h"
 
+#include <cstdio>
+
 #include "common/RnNoiseCommonPlugin.h"
 
 const char *RnNoiseVstPlugin::s_programName = "Noise Suppression";
