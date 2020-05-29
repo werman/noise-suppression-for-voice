@@ -4,7 +4,8 @@
 
 #include "common/RnNoiseCommonPlugin.h"
 
-const char *RnNoiseVstPlugin::s_programName = "Noise Suppression";
+const char *RnNoiseVstPlugin::s_effectName = "Noise Suppression";
+const char *RnNoiseVstPlugin::s_productString = "Noise Suppression";
 
 RnNoiseVstPlugin::RnNoiseVstPlugin(audioMasterCallback audioMaster, VstInt32 numPrograms, VstInt32 numParams)
         : AudioEffectX(audioMaster, numPrograms, numParams) {
@@ -38,8 +39,14 @@ VstInt32 RnNoiseVstPlugin::stopProcess() {
     return AudioEffectX::stopProcess();
 }
 
-void RnNoiseVstPlugin::getProgramName(char *name) {
-    strcpy(name, s_programName);
+bool RnNoiseVstPlugin::getEffectName(char *name) {
+    strcpy(name, s_effectName);
+    return true;
+}
+
+bool RnNoiseVstPlugin::getProductString(char *name) {
+    strcpy(name, s_productString);
+    return true;
 }
 
 extern AudioEffect *createEffectInstance(audioMasterCallback audioMaster) {
