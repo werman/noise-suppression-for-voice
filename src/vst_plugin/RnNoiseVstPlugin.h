@@ -19,7 +19,9 @@ public:
 
     void processReplacing(float **inputs, float **outputs, VstInt32 sampleFrames) override;
 
-    void getProgramName(char *name) override;
+    bool getEffectName(char *name) override;
+
+    bool getProductString(char *name) override;
 
     void getParameterLabel(VstInt32 index, char* label) override;
 
@@ -34,7 +36,9 @@ public:
     static const VstInt32 numParameters = 1;
 
 private:
-    static const char* s_programName;
+    static const char* s_effectName;
+
+    static const char* s_productString;
 
     enum class Parameters {
         vadThreshold = 0
