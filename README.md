@@ -22,6 +22,8 @@ To enable the plugin in Equalizer APO select "Plugins" -> "VST Plugin" and speci
 
 #### Pulseaudio
 
+:warning: Chrome(Chromium) doesn't work with the setup from this section, it doesn't like "Monitor of Null Output" we create.
+
 The idea is:
 
 - Create a sink from which apps will take audio later and which will be the end think in the chain.
