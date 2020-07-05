@@ -20,67 +20,66 @@ To enable the plugin in Equalizer APO select "Plugins" -> "VST Plugin" and speci
 
 ### Linux
 
-#### Pulseaudio
-
-:warning: Chrome(Chromium) doesn't work with the setup from this section, it doesn't like "Monitor of Null Output" we create.
+#### PulseAudio
 
 The idea is:
 
 - Create a sink from which apps will take audio later and which will be the end think in the chain.
-- Load the plugin which outputs to already created sink ('sink_master' parameter) and has input sink ('sink_name' parameter, sink will be created). 
-- Create loopback from microphone ('source') to input sink of plugin ('sink') with 1 channel.
- 
+- Load the plugin which outputs to already created sink (`sink_master` parameter) and has input sink (`sink_name` parameter, sink will be created).
+- Create loopback from microphone (`source`) to input sink of plugin (`sink`) with 1 channel.
 
+For example, to create a new mono device with noise-reduced audio from your microphone, first, find your mic name using e.g.:
+```sh
+pactl list sources short
 ```
-pacmd load-module module-null-sink sink_name=mic_denoised_out  
 
+Then, create the new device using:
+```sh
+pacmd load-module module-null-sink sink_name=mic_denoised_out
 pacmd load-module module-ladspa-sink sink_name=mic_raw_in sink_master=mic_denoised_out label=noise_suppressor_mono plugin=/path/to/librnnoise_ladspa.so control=50
-
-pacmd load-module module-loopback source=your_mic_name sink=mic_raw_in channels=1
+pacmd load-module module-loopback source=<your_mic_name> sink=mic_raw_in channels=1
 ```
 
-This should be executed every time pulse audio is launched. This can be done by creating file in ~/.config/pulse/default.pa with:
+This needs to be executed every time PulseAudio is launched.
+You can automate this by creating file in `~/.config/pulse/default.pa` with the content:
 
 ```
 .include /etc/pulse/default.pa
 
-load-module module-null-sink sink_name=mic_denoised_out  
+load-module module-null-sink sink_name=mic_denoised_out
 load-module module-ladspa-sink sink_name=mic_raw_in sink_master=mic_denoised_out label=noise_suppressor_mono plugin=/path/to/librnnoise_ladspa.so control=50
 load-module module-loopback source=your_mic_name sink=mic_raw_in channels=1
 
 set-default-source mic_denoised_out.monitor
 ```
 
-For stereo input use:
+If you have a stereo input use these options instead:
 
-`label=noise_suppressor_stereo`
+- `label=noise_suppressor_stereo`
+- `channels=2`
 
-and
+:warning: Chrome and other Chromium based browsers will ignore monitor devices and you will not be able to select the "Monitor of Null Output".
+To work around this, either use pavucontrol to assign the input to Chrome, or remap this device in PulseAudio to create a regular source:
 
-`channels=2`
-
-You can get `librnnoise_ladspa.so` either by downloading latest release or by compiling it yourself.
-
-Your mic name can be found by:
-
-```
-pacmd list-sources
+```sh
+pacmd load-module module-remap-source source_name=denoised master=mic_denoised_out.monitor channels=1
 ```
 
-You may still need to set correct input for application, this can be done in audio mixer panel (if you have one) in 'Recording' tab where you should set 'Monitor of Null Output' as source.
+Additional notes:
+- You can get `librnnoise_ladspa.so` either by downloading latest release or by compiling it yourself.
+- You may still need to set correct input for application, this can be done in audio mixer panel (if you have one) in 'Recording' tab where you should set 'Monitor of Null Output' as source.
 
 Plugin settings:
 
 - VAD Threshold (%) - if probability of sound being a voice is lower than this threshold - silence will be returned.
+  By default VAD threshold is 50% which should work with any mic. For most mics higher threshold `control=95` would be fine.
+  Without the VAD some loud noises may still be a little bit audible when there is no voice.
+- There is also an implicit grace period of 200 milliseconds, meaning that after the last voice detection - output won't be silenced for 200 ms.
 
-By default VAD threshold is 50% which should work with any mic. For most mics higher threshold `control=95` would be fine.
-Without the VAD some loud noises may still be a little bit audible when there is no voice.
+Further reading:
 
-There is also an implicit grace period of 200 milliseconds, meaning that after the last voice detection - output won't be silenced for 200 ms.
-
-Useful detailed info about pulseaudio logic [toadjaune/pulseaudio-config](https://github.com/toadjaune/pulseaudio-config).
-
-The [thread](https://bugs.freedesktop.org/show_bug.cgi?id=101043) which helped me with how to post-process mic output and make it available to applications.
+- Useful detailed info about PulseAudio logic [toadjaune/pulseaudio-config](https://github.com/toadjaune/pulseaudio-config).
+- The [thread](https://bugs.freedesktop.org/show_bug.cgi?id=101043) which helped me with how to post-process mic output and make it available to applications.
 
 ### MacOS
 
