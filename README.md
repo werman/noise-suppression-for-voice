@@ -131,6 +131,21 @@ cd build-mingw64
 make
 ```
 
+### Turning plugins on and off
+
+By default, all three plugins are being built if the necessary libraries are present.
+You can deliberately turn off plugins by using the following CMake flags:
+
+- `BUILD_VST_PLUGIN`
+- `BUILD_LV2_PLUGIN`
+- `BUILD_LADSPA_PLUGIN`
+
+For example:
+
+```sh
+cmake -DBUILD_VST_PLUGIN=OFF
+```
+
 ## License
 
 This project is licensed under the GNU General Public License v3.0 - see the LICENSE file for details.
