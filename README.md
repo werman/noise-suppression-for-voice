@@ -35,7 +35,7 @@ pactl list sources short
 
 Then, create the new device using:
 ```sh
-pacmd load-module module-null-sink sink_name=mic_denoised_out
+pacmd load-module module-null-sink sink_name=mic_denoised_out rate=48000
 pacmd load-module module-ladspa-sink sink_name=mic_raw_in sink_master=mic_denoised_out label=noise_suppressor_mono plugin=/path/to/librnnoise_ladspa.so control=50
 pacmd load-module module-loopback source=<your_mic_name> sink=mic_raw_in channels=1
 ```
@@ -46,7 +46,7 @@ You can automate this by creating file in `~/.config/pulse/default.pa` with the 
 ```
 .include /etc/pulse/default.pa
 
-load-module module-null-sink sink_name=mic_denoised_out
+load-module module-null-sink sink_name=mic_denoised_out rate=48000
 load-module module-ladspa-sink sink_name=mic_raw_in sink_master=mic_denoised_out label=noise_suppressor_mono plugin=/path/to/librnnoise_ladspa.so control=50
 load-module module-loopback source=your_mic_name sink=mic_raw_in channels=1
 
