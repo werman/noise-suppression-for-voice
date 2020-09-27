@@ -18,6 +18,8 @@ To check or change mic settings go to "Recording devices" -> "Recording" -> "Pro
 
 To enable the plugin in Equalizer APO select "Plugins" -> "VST Plugin" and specify the plugin dll.
 
+See [detailed guide](https://medium.com/@bssankaran/free-and-open-source-software-noise-cancelling-for-working-from-home-edb1b4e9764e) provided by  [@bssankaran](https://github.com/bssankaran).
+
 ### Linux
 
 #### PulseAudio
