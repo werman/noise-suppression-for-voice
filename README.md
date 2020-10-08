@@ -39,7 +39,7 @@ Then, create the new device using:
 ```sh
 pacmd load-module module-null-sink sink_name=mic_denoised_out rate=48000
 pacmd load-module module-ladspa-sink sink_name=mic_raw_in sink_master=mic_denoised_out label=noise_suppressor_mono plugin=/path/to/librnnoise_ladspa.so control=50
-pacmd load-module module-loopback source=<your_mic_name> sink=mic_raw_in channels=1
+pacmd load-module module-loopback source=<your_mic_name> sink=mic_raw_in channels=1 source_dont_move=true sink_dont_move=true
 ```
 
 This needs to be executed every time PulseAudio is launched.
@@ -50,7 +50,7 @@ You can automate this by creating file in `~/.config/pulse/default.pa` with the 
 
 load-module module-null-sink sink_name=mic_denoised_out rate=48000
 load-module module-ladspa-sink sink_name=mic_raw_in sink_master=mic_denoised_out label=noise_suppressor_mono plugin=/path/to/librnnoise_ladspa.so control=50
-load-module module-loopback source=your_mic_name sink=mic_raw_in channels=1
+load-module module-loopback source=your_mic_name sink=mic_raw_in channels=1 source_dont_move=true sink_dont_move=true
 
 set-default-source mic_denoised_out.monitor
 ```
