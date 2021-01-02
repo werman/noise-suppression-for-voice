@@ -45,6 +45,10 @@ configure_file(resources/manifest.ttl ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/rnnoise.
 configure_file(resources/rnnoise.ttl ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/rnnoise.lv2/rnnoise.ttl)
 
 install(TARGETS ${LV2_TARGET}
-        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}/lv2
-        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}/lv2
-        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}/lv2)
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}/lv2/rnnoise.lv2/
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}/lv2/rnnoise.lv2/
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}/lv2/rnnoise.lv2/)
+install(DIRECTORY ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/rnnoise.lv2/
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/lv2/rnnoise.lv2
+        FILES_MATCHING PATTERN "*.ttl"
+        )
