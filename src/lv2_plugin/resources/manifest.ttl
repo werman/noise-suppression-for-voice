@@ -3,5 +3,5 @@
 
 <https://github.com/werman/noise-suppression-for-voice>
 	a lv2:Plugin ;
-	lv2:binary <librnnoise_lv2${CMAKE_SHARED_LIBRARY_SUFFIX}>  ;
+	lv2:binary <rnnoise_lv2${CMAKE_SHARED_LIBRARY_SUFFIX}>  ;
 	rdfs:seeAlso <rnnoise.ttl> .
