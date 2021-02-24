@@ -90,27 +90,32 @@ Further reading:
 
 You may need to make sure that the LADSPA plugin is copied to the correct directory for your distribution. Check the plugin has been registered with:
 
-```echo "ladspa-register" | ecasound -c
+```sh
+echo "ladspa-register" | ecasound -c
 ```
 
-```echo "ladspa-register" | ecasound -c
+```sh
+echo "ladspa-register" | ecasound -c
 ```
 
 If the noise_suppressor_mono and noise_supressor_stereo plugins are not visible, ensure its directory is in the plugin path:
 
-```export LADSPA_PATH=$LADSPA_PATH:/path_to_ladspa.so
+```sh
+export LADSPA_PATH=$LADSPA_PATH:/path_to_ladspa.so
 ```
 
 To process a file:
 
-```ecasound -i infile.wav -o outfile.wav -el:noise_suppressor_stereo,n
+```sh
+ecasound -i infile.wav -o outfile.wav -el:noise_suppressor_stereo,n
 ```
 
 Where n is the VAD threshold as described above.
 
 To process in realtime using the ASLA default input and output devices (e.g. a USB sound card):
 
-```ecasound -i alsa -o alsa -el:noise_suppressor_stereo,n
+```sh
+ecasound -i alsa -o alsa -el:noise_suppressor_stereo,n
 ```
 
 A small device such as a Raspberry Pi model B can easily process a stereo signal in realtime. The plugin can be compiled on the device using the x64 instructions below.
