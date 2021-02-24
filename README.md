@@ -83,6 +83,7 @@ Further reading:
 - Useful detailed info about PulseAudio logic [toadjaune/pulseaudio-config](https://github.com/toadjaune/pulseaudio-config).
 - The [thread](https://bugs.freedesktop.org/show_bug.cgi?id=101043) which helped me with how to post-process mic output and make it available to applications.
 
+
 #### Ecasound
 
 [Ecasound](https://ecasound.seul.org/ecasound/) is a software package designed for multitrack auto processing and makes it easy to chain together processing blocks. Packages are available for most distributions.
@@ -113,6 +114,7 @@ To process in realtime using the ASLA default input and output devices (e.g. a U
 ```
 
 A small device such as a Raspberry Pi model B can easily process a stereo signal in realtime. The plugin can be compiled on the device using the x64 instructions below.
+
 
 ### MacOS
 
