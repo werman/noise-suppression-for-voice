@@ -94,14 +94,10 @@ You may need to make sure that the LADSPA plugin is copied to the correct direct
 echo "ladspa-register" | ecasound -c
 ```
 
-```sh
-echo "ladspa-register" | ecasound -c
-```
-
-If the noise_suppressor_mono and noise_supressor_stereo plugins are not visible, ensure its directory is in the plugin path:
+If the noise_suppressor_mono and noise_supressor_stereo plugins are not shown, ensure its directory is in the plugin path:
 
 ```sh
-export LADSPA_PATH=$LADSPA_PATH:/path_to_ladspa.so
+export LADSPA_PATH=$LADSPA_PATH:/path_to_librnnoise_ladspa.so
 ```
 
 To process a file:
