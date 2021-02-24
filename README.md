@@ -92,8 +92,7 @@ You may need to make sure that the LADSPA plugin is copied to the correct direct
 ```echo "ladspa-register" | ecasound -c
 ```
 
-```sh
-pacmd load-module module-remap-source source_name=denoised master=mic_denoised_out.monitor channels=1
+```echo "ladspa-register" | ecasound -c
 ```
 
 If the noise_suppressor_mono and noise_supressor_stereo plugins are not visible, ensure its directory is in the plugin path:
