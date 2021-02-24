@@ -1,3 +1,5 @@
+# Please note: I have only created this fork from the upstrea version as a place to save my information about creating a realtime hardware device using a Raspberry Pi. Please use the [werman repository](https://github.com/werman/noise-suppression-for-voice) to download your code and report any bugs.
+
 # Real-time Noise Suppression Plugin (VST2, LV2, LADSPA)
 
 A real-time noise suppression plugin for voice based on [Xiph's RNNoise](https://github.com/xiph/rnnoise). [More info about the base library](https://people.xiph.org/~jm/demo/rnnoise/).
