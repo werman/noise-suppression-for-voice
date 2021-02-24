@@ -1,4 +1,4 @@
-# Please note: I have only created this fork from the upstrea version as a place to save my information about creating a realtime hardware device using a Raspberry Pi. Please use the [werman repository](https://github.com/werman/noise-suppression-for-voice) to download your code and report any bugs.
+# Please note: I have only created this fork from the upstream version as a place to save my information about creating a realtime hardware device using a Raspberry Pi. Please use the [werman repository](https://github.com/werman/noise-suppression-for-voice) to download your code and report any bugs.
 
 # Real-time Noise Suppression Plugin (VST2, LV2, LADSPA)
 
