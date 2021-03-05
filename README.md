@@ -26,7 +26,7 @@ See [detailed guide](https://medium.com/@bssankaran/free-and-open-source-softwar
 
 The idea is:
 
-- Create a sink from which apps will take audio later and which will be the end think in the chain.
+- Create a sink from which apps will take audio later and which will be the end sink in the chain.
 - Load the plugin which outputs to already created sink (`sink_master` parameter) and has input sink (`sink_name` parameter, sink will be created).
 - Create loopback from microphone (`source`) to input sink of plugin (`sink`) with 1 channel.
 
