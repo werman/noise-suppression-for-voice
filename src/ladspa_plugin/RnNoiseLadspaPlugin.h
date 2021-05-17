@@ -17,6 +17,18 @@ namespace port_info_custom {
                     99.f
             }
     };
+
+    constexpr static port_info_t vad_grace_period_input = {
+            "VAD Grace period (10ms steps)",
+            "Grace period after VAD activation before silence will be returned",
+            port_types::input | port_types::control,
+            {
+                    port_hints::bounded_below | port_hints::bounded_above | port_hints::integer |
+                    port_hints::default_minimum,
+                    20.f,
+                    100.f
+            }
+    };
 }
 
 struct RnNoiseMono {
@@ -24,6 +36,7 @@ struct RnNoiseMono {
         in_1,
         out_1,
         in_vad_threshold,
+        in_vad_grace_period,
         size
     };
 
@@ -32,6 +45,7 @@ struct RnNoiseMono {
                     port_info_common::audio_input,
                     port_info_common::audio_output,
                     port_info_custom::vad_threshold_input,
+                    port_info_custom::vad_grace_period_input,
                     port_info_common::final_port
             };
 
@@ -60,10 +74,11 @@ struct RnNoiseMono {
         const_buffer in_buffer = ports.get<port_names::in_1>();
         buffer out_buffer = ports.get<port_names::out_1>();
         uint32_t vad_threshold = ports.get<port_names::in_vad_threshold>();
+        short vad_grace_period = ports.get<port_names::in_vad_grace_period>();
 
         float vad_threshold_normalized = std::max(std::min(vad_threshold / 100.f, 0.99f), 0.f);
 
-        m_rnNoisePlugin.process(in_buffer.data(), out_buffer.data(), in_buffer.size(), vad_threshold_normalized);
+        m_rnNoisePlugin.process(in_buffer.data(), out_buffer.data(), in_buffer.size(), vad_threshold_normalized, vad_grace_period);
     }
 
     RnNoiseCommonPlugin m_rnNoisePlugin;
@@ -76,6 +91,7 @@ struct RnNoiseStereo {
         out_1,
         out_r,
         in_vad_threshold,
+        in_vad_grace_period,
         size
     };
 
@@ -86,6 +102,7 @@ struct RnNoiseStereo {
                     port_info_common::audio_output_l,
                     port_info_common::audio_output_r,
                     port_info_custom::vad_threshold_input,
+                    port_info_custom::vad_grace_period_input,
                     port_info_common::final_port
             };
 
@@ -123,8 +140,10 @@ struct RnNoiseStereo {
 
         float vad_threshold_normalized = std::max(std::min(vad_threshold / 100.f, 0.99f), 0.f);
 
-        m_rnNoisePluginL.process(in_buffer_l.data(), out_buffer_l.data(), in_buffer_l.size(), vad_threshold_normalized);
-        m_rnNoisePluginR.process(in_buffer_r.data(), out_buffer_r.data(), in_buffer_r.size(), vad_threshold_normalized);
+        short vad_grace_period = ports.get<port_names::in_vad_grace_period>();
+
+        m_rnNoisePluginL.process(in_buffer_l.data(), out_buffer_l.data(), in_buffer_l.size(), vad_threshold_normalized, vad_grace_period);
+        m_rnNoisePluginR.process(in_buffer_r.data(), out_buffer_r.data(), in_buffer_r.size(), vad_threshold_normalized, vad_grace_period);
     }
 
     RnNoiseCommonPlugin m_rnNoisePluginL;

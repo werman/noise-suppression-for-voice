@@ -12,7 +12,7 @@ public:
 
     void deinit();
 
-    void process(const float *in, float *out, int32_t sampleFrames, float vadThreshold);
+    void process(const float *in, float *out, int32_t sampleFrames, float vadThreshold, short vadGracePeriod = k_vadGracePeriodSamples);
 
 private:
 

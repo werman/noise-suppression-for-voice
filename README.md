@@ -38,7 +38,7 @@ pactl list sources short
 Then, create the new device using:
 ```sh
 pacmd load-module module-null-sink sink_name=mic_denoised_out rate=48000
-pacmd load-module module-ladspa-sink sink_name=mic_raw_in sink_master=mic_denoised_out label=noise_suppressor_mono plugin=/path/to/librnnoise_ladspa.so control=50
+pacmd load-module module-ladspa-sink sink_name=mic_raw_in sink_master=mic_denoised_out label=noise_suppressor_mono plugin=/path/to/librnnoise_ladspa.so control=50,
 pacmd load-module module-loopback source=<your_mic_name> sink=mic_raw_in channels=1 source_dont_move=true sink_dont_move=true
 ```
 
@@ -49,7 +49,7 @@ You can automate this by creating file in `~/.config/pulse/default.pa` with the 
 .include /etc/pulse/default.pa
 
 load-module module-null-sink sink_name=mic_denoised_out rate=48000
-load-module module-ladspa-sink sink_name=mic_raw_in sink_master=mic_denoised_out label=noise_suppressor_mono plugin=/path/to/librnnoise_ladspa.so control=50
+load-module module-ladspa-sink sink_name=mic_raw_in sink_master=mic_denoised_out label=noise_suppressor_mono plugin=/path/to/librnnoise_ladspa.so control=50,
 load-module module-loopback source=your_mic_name sink=mic_raw_in channels=1 source_dont_move=true sink_dont_move=true
 
 set-default-source mic_denoised_out.monitor
@@ -74,9 +74,10 @@ Additional notes:
 Plugin settings:
 
 - VAD Threshold (%) - if probability of sound being a voice is lower than this threshold - silence will be returned.
-  By default VAD threshold is 50% which should work with any mic. For most mics higher threshold `control=95` would be fine.
+  By default VAD threshold is 50% which should work with any mic. For most mics higher threshold `control=95,` would be fine.
   Without the VAD some loud noises may still be a little bit audible when there is no voice.
-- There is also an implicit grace period of 200 milliseconds, meaning that after the last voice detection - output won't be silenced for 200 ms.
+- VAD Grace period (10ms steps) - configures the grace period before silence will be returned.
+  Default is 20 (200ms). Configurable range is from 20 to 100. If your voice is getting cutoff try a higher value like `control=50,35`.
 
 Further reading:
 

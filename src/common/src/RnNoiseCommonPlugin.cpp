@@ -17,8 +17,9 @@ void RnNoiseCommonPlugin::deinit() {
     m_denoiseState.reset();
 }
 
-void RnNoiseCommonPlugin::process(const float *in, float *out, int32_t sampleFrames, float vadThreshold) {
+void RnNoiseCommonPlugin::process(const float *in, float *out, int32_t sampleFrames, float vadThreshold, short vadGracePeriod)  {
     assert(vadThreshold >= 0.f && vadThreshold <= 1.f);
+    assert(vadGracePeriod >= 20 && vadGracePeriod <= 100);
 
     if (sampleFrames == 0) {
         return;
@@ -39,7 +40,7 @@ void RnNoiseCommonPlugin::process(const float *in, float *out, int32_t sampleFra
         float vadProbability = rnnoise_process_frame(m_denoiseState.get(), out, &m_inputBuffer[0]);
 
         if (vadProbability >= vadThreshold) {
-            m_remainingGracePeriod = k_vadGracePeriodSamples;
+            m_remainingGracePeriod = vadGracePeriod;
         }
 
         if (m_remainingGracePeriod > 0) {
@@ -79,7 +80,7 @@ void RnNoiseCommonPlugin::process(const float *in, float *out, int32_t sampleFra
                 float vadProbability = rnnoise_process_frame(m_denoiseState.get(), currentOutBuffer, currentInBuffer);
 
                 if (vadProbability >= vadThreshold) {
-                    m_remainingGracePeriod = k_vadGracePeriodSamples;
+                    m_remainingGracePeriod = vadGracePeriod;
                 }
 
                 if (m_remainingGracePeriod > 0) {
