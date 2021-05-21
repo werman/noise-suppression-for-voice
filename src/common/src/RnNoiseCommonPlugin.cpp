@@ -64,16 +64,16 @@ void RnNoiseCommonPlugin::process(const float *in, float *out, int32_t sampleFra
             }
         }
 
-        const size_t samplesToProcess = m_inputBuffer.size() / k_denoiseFrameSize;
-        const size_t framesToProcess = samplesToProcess * k_denoiseFrameSize;
+        const size_t framesToProcess = m_inputBuffer.size() / k_denoiseFrameSize;
+        const size_t samplesToProcess = framesToProcess * k_denoiseFrameSize;
 
-        m_outputBuffer.resize(m_outputBuffer.size() + framesToProcess);
+        m_outputBuffer.resize(m_outputBuffer.size() + samplesToProcess);
 
         // Process input buffer by chunks of k_denoiseFrameSize, put result into out buffer to return into range [-1.f,1.f]
         {
-            float *outBufferWriteStart = &(*(m_outputBuffer.end() - framesToProcess));
+            float *outBufferWriteStart = &(*(m_outputBuffer.end() - samplesToProcess));
 
-            for (size_t i = 0; i < samplesToProcess; i++) {
+            for (size_t i = 0; i < framesToProcess; i++) {
                 float *currentOutBuffer = &outBufferWriteStart[i * k_denoiseFrameSize];
                 float *currentInBuffer = &m_inputBuffer[i * k_denoiseFrameSize];
                 float vadProbability = rnnoise_process_frame(m_denoiseState.get(), currentOutBuffer, currentInBuffer);
@@ -97,10 +97,12 @@ void RnNoiseCommonPlugin::process(const float *in, float *out, int32_t sampleFra
 
         const size_t toCopyIntoOutput = std::min(m_outputBuffer.size(), static_cast<size_t>(sampleFrames));
 
-        std::memcpy(out, &m_outputBuffer[0], toCopyIntoOutput * sizeof(float));
+        if (toCopyIntoOutput > 0) {
+            std::memcpy(out, &m_outputBuffer[0], toCopyIntoOutput * sizeof(float));
 
-        m_inputBuffer.erase(m_inputBuffer.begin(), m_inputBuffer.begin() + framesToProcess);
-        m_outputBuffer.erase(m_outputBuffer.begin(), m_outputBuffer.begin() + toCopyIntoOutput);
+            m_inputBuffer.erase(m_inputBuffer.begin(), m_inputBuffer.begin() + samplesToProcess);
+            m_outputBuffer.erase(m_outputBuffer.begin(), m_outputBuffer.begin() + toCopyIntoOutput);
+        }
 
         if (toCopyIntoOutput < sampleFrames) {
             std::fill(out + toCopyIntoOutput, out + sampleFrames, 0.f);
