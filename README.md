@@ -22,6 +22,31 @@ See [detailed guide](https://medium.com/@bssankaran/free-and-open-source-softwar
 
 ### Linux
 
+#### PipeWire
+
+You could use [pulseeffects](https://github.com/wwmm/pulseeffects) which is a nice GUI application with many useful filters, however I failed to make it work consistently to post-process the output of my mic, the below method should be more bulletproof. 
+
+See [a simple guide on PipeWire wiki](https://gitlab.freedesktop.org/pipewire/pipewire/-/wikis/Filter-Chain#rnnoise-example), you would only need to change `plugin = ladspa/librnnoise_ladspa` to `plugin = actual/path/of/plugin/librnnoise_ladspa.so`.
+
+To make the change persistent you could create a `systemd` service, create `pipewire-input-filter-chain.service` file in `~/.config/systemd/user/`:
+
+```
+[Unit]
+Description=PipeWire Input Filter Chain
+After=pipewire.service
+BindsTo=pipewire.service
+
+[Service]
+ExecStart=/usr/bin/pipewire -c /path/to/config/from/pipewire/wiki
+Type=simple
+Restart=on-failure
+
+[Install]
+WantedBy=pipewire.service
+```
+
+And immediately enable it for the current user with `systemctl enable --user --now pipewire-input-filter-chain.service`.
+
 #### PulseAudio
 
 The idea is:
