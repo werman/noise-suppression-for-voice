@@ -85,6 +85,11 @@ If you have a stereo input use these options instead:
 - `label=noise_suppressor_stereo`
 - `channels=2`
 
+If you have problems with audio crackling or high / periodically increasing latency, adding `latency_msec=1` to the loopback might help:
+```
+load-module module-loopback source=your_mic_name sink=mic_raw_in channels=1 source_dont_move=true sink_dont_move=true latency_msec=1
+```
+
 :warning: Chrome and other Chromium based browsers will ignore monitor devices and you will not be able to select the "Monitor of Null Output".
 To work around this, either use pavucontrol to assign the input to Chrome, or remap this device in PulseAudio to create a regular source:
 
