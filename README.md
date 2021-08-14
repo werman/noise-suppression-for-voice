@@ -122,7 +122,7 @@ I'm not associated with the original work in any way and have only superficial u
 
 ## Developing
 
-VST sdk files aren't shipped here due to their license. You need to download VST sdk and copy several files to src/pluginterfaces/vst2.x/ and to src/vst2.x/. You can find sdk [here](https://www.steinberg.net/en/company/developers.html).
+VST sdk files aren't shipped here due to their license. You need to download VST sdk and copy several files to src/pluginterfaces/vst2.x/ and to src/vst2.x/. You can find sdk [on archive.org](https://archive.org/details/VST2SDK) since it was removed from the official [website](https://www.steinberg.net/en/company/developers.html).
 
 LV2 and LADSPA sdk files are in repository.
 
