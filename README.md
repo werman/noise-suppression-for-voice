@@ -124,6 +124,24 @@ I'm not associated with the original work in any way and have only superficial u
 
 VST sdk files aren't shipped here due to their license. You need to download VST sdk and copy several files to src/pluginterfaces/vst2.x/ and to src/vst2.x/. You can find sdk [on archive.org](https://archive.org/details/VST2SDK) since it was removed from the official [website](https://www.steinberg.net/en/company/developers.html).
 
+```
+├── pluginterfaces
+│  └── vst2.x
+│     ├── aeffect.h              |
+│     ├── aeffectx.h             | -> Copy into src/pluginterfaces/vst2.x/
+│     └── vstfxstore.h           |
+├── public.sdk
+│  ├── samples
+│  └── source
+│     └── vst2.x
+│        ├── aeffeditor.h        |
+│        ├── audioeffect.cpp     |
+│        ├── audioeffect.h       |
+│        ├── audioeffectx.cpp    | -> Copy into src/vst2.x/
+│        ├── audioeffectx.h      |
+│        └── vstplugmain.cpp     |
+```
+
 LV2 and LADSPA sdk files are in repository.
 
 All improvements are welcomed!
