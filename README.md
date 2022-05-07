@@ -26,7 +26,7 @@ See [detailed guide](https://medium.com/@bssankaran/free-and-open-source-softwar
 
 You could use [pulseeffects](https://github.com/wwmm/pulseeffects) which is a nice GUI application with many useful filters, however I failed to make it work consistently to post-process the output of my mic, the below method should be more bulletproof. 
 
-See [a simple guide on PipeWire wiki](https://gitlab.freedesktop.org/pipewire/pipewire/-/wikis/Filter-Chain#rnnoise-example), you would only need to change `plugin = ladspa/librnnoise_ladspa` to `plugin = actual/path/of/plugin/librnnoise_ladspa.so`.
+See under "Example configuration of a virtual source" [in the PipeWire documentation](https://docs.pipewire.org/page_module_filter_chain.html), you would only need to change `plugin = ladspa/librnnoise_ladspa` to `plugin = actual/path/of/plugin/librnnoise_ladspa.so`.
 
 To make the change persistent you could create a `systemd` service, create `pipewire-input-filter-chain.service` file in `~/.config/systemd/user/`:
 
