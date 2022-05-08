@@ -28,24 +28,16 @@ You could use [pulseeffects](https://github.com/wwmm/pulseeffects) which is a ni
 
 See under "Example configuration of a virtual source" [in the PipeWire documentation](https://docs.pipewire.org/page_module_filter_chain.html), you would only need to change `plugin = ladspa/librnnoise_ladspa` to `plugin = actual/path/of/plugin/librnnoise_ladspa.so`.
 
-To make the change persistent you could create a `systemd` service, create `pipewire-input-filter-chain.service` file in `~/.config/systemd/user/`:
+To make the change persistent you could add it to your `pipewire.conf`. According to the pipewire documentation the best practice would be to first copy the example `pipewire.conf` from `/usr/share/pipewire/pipewire.conf` into your own `~/.config/pipewire/pipewire.conf`.
 
 ```
-[Unit]
-Description=PipeWire Input Filter Chain
-After=pipewire.service
-BindsTo=pipewire.service
-
-[Service]
-ExecStart=/usr/bin/pipewire -c /path/to/config/from/pipewire/wiki
-Type=simple
-Restart=on-failure
-
-[Install]
-WantedBy=pipewire.service
+mkdir -p ~/.config/pipewire
+cp /usr/share/pipewire/pipewire.conf ~/.config/pipewire/pipewire.conf
 ```
 
-And immediately enable it for the current user with `systemctl enable --user --now pipewire-input-filter-chain.service`.
+Now you can edit `~/.config/pipewire/pipewire.conf` and under the `context.modules` section, add the Example configuration from the Pipewire docs to the end of the section. Paste it after `{ name = libpipewire-module-session-manager }` to be more precise.
+
+Save and restart the pipewire service.
 
 #### PulseAudio
 
