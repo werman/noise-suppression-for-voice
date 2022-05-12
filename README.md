@@ -1,3 +1,5 @@
+# Please note: I have only created this fork from the upstream version as a place to save my information about creating a realtime hardware device using a Raspberry Pi. Please use the [werman repository](https://github.com/werman/noise-suppression-for-voice) to download your code and report any bugs.
+
 # Real-time Noise Suppression Plugin (VST2, LV2, LADSPA)
 
 A real-time noise suppression plugin for voice based on [Xiph's RNNoise](https://github.com/xiph/rnnoise). [More info about the base library](https://people.xiph.org/~jm/demo/rnnoise/).
@@ -104,6 +106,40 @@ Further reading:
 
 - Useful detailed info about PulseAudio logic [toadjaune/pulseaudio-config](https://github.com/toadjaune/pulseaudio-config).
 - The [thread](https://bugs.freedesktop.org/show_bug.cgi?id=101043) which helped me with how to post-process mic output and make it available to applications.
+
+
+#### Ecasound
+
+[Ecasound](https://ecasound.seul.org/ecasound/) is a software package designed for multitrack auto processing and makes it easy to chain together processing blocks. Packages are available for most distributions.
+
+You may need to make sure that the LADSPA plugin is copied to the correct directory for your distribution. Check the plugin has been registered with:
+
+```sh
+echo "ladspa-register" | ecasound -c
+```
+
+If the noise_suppressor_mono and noise_supressor_stereo plugins are not shown, ensure its directory is in the plugin path:
+
+```sh
+export LADSPA_PATH=$LADSPA_PATH:/path_to_librnnoise_ladspa.so
+```
+
+To process a file:
+
+```sh
+ecasound -i infile.wav -o outfile.wav -el:noise_suppressor_stereo,n
+```
+
+Where n is the VAD threshold as described above.
+
+To process in realtime using the ASLA default input and output devices (e.g. a USB sound card):
+
+```sh
+ecasound -i alsa -o alsa -el:noise_suppressor_stereo,n
+```
+
+A small device such as a Raspberry Pi model B can easily process a stereo signal in realtime. The plugin can be compiled on the device using the x64 instructions below.
+
 
 ### MacOS
 
