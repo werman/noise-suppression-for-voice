@@ -1,7 +1,0 @@
-@prefix lv2:  <http://lv2plug.in/ns/lv2core#> .
-@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
-
-<https://github.com/werman/noise-suppression-for-voice>
-	a lv2:Plugin ;
-	lv2:binary <rnnoise_lv2${CMAKE_SHARED_LIBRARY_SUFFIX}>  ;
-	rdfs:seeAlso <rnnoise.ttl> .

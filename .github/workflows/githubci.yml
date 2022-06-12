@@ -1,45 +1,98 @@
 name: CMake Build Matrix
 
-on: [push, pull_request]
+on:
+  push:
+    branches:
+      - master
+      - develop
+      - ci-test
+  pull_request:
+    branches:
+      - master
+
+  workflow_dispatch:
+
+# Building all the plugins doesn't add information but adds time,
+# so build them only for manually launched build.
+env:
+  full_build: ${{ (github.event_name == 'workflow_dispatch') && 1 || 0 }}
 
 jobs:
   build:
     name: ${{ matrix.config.name }}
     runs-on: ${{ matrix.config.os }}
     strategy:
-      fail-fast: false
+      fail-fast: true
       matrix:
         config:
-#          MSVC compiler 16.5.0+d4cbfca49 crashes with:
-#            ladspa++.h(655,1): fatal error C1001: Internal compiler error.
-#
-#          - {
-#            name: "Windows Latest MSVC",
-#            os: windows-latest,
-#            cc: "cl", cxx: "cl",
-#            environment_script: "C:/Program Files (x86)/Microsoft Visual Studio/2019/Enterprise/VC/Auxiliary/Build/vcvars64.bat"
-#          }
+          - {
+            name: "Windows Latest MSVC",
+            os: windows-latest,
+            cc: "cl", cxx: "cl",
+            artifact_prefix: "win"
+          }
           - {
             name: "Ubuntu Latest GCC",
             os: ubuntu-latest,
-            cc: "gcc", cxx: "g++"
+            cc: "gcc", cxx: "g++",
+            artifact_prefix: "linux"
           }
           - {
             name: "macOS Latest Clang",
             os: macos-latest,
-            cc: "clang", cxx: "clang++"
+            cc: "clang", cxx: "clang++",
+            artifact_prefix: "macos",
           }
 
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v3
+
+      - name: Install Ubuntu dependencies
+        if: ${{ matrix.config.os == 'ubuntu-latest' }}
+        run: |
+          sudo apt-get install --no-install-recommends \
+              libx11-dev libxcomposite-dev libxcursor-dev libxext-dev libxinerama-dev libxrandr-dev libxrender-dev
+
+      - name: ccache
+        # TODO: Make MSVC build work with ccache
+        if: ${{ matrix.config.os != 'windows-latest' }}
+        uses: hendrikmuhs/ccache-action@v1.2.2
+        with:
+          key: ${{ matrix.config.os }}
+          variant: ccache
+          max-size: 100M
 
       - name: Configure
         env:
           CC: ${{ matrix.config.cc }}
           CXX: ${{ matrix.config.cxx }}
-        run: |
-          cmake -Bbuild -DCMAKE_BUILD_TYPE=Release
+          CMAKE_OSX_ARCHITECTURES: "x86_64;arm64"
+        run: >-
+          cmake -B${{runner.workspace}}/build -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+          -DBUILD_LADSPA_PLUGIN=1
+          -DBUILD_VST_PLUGIN=1
+          -DBUILD_VST3_PLUGIN=${{env.full_build}}
+          -DBUILD_LV2_PLUGIN=${{env.full_build}}
+          -DBUILD_AU_PLUGIN=${{env.full_build}}
+          -DBUILD_AUV3_PLUGIN=${{env.full_build}}
 
       - name: Build
         run: |
-          cmake --build build
+          cmake --build ${{runner.workspace}}/build --parallel
+
+      - name: Run tests
+        env:
+          CTEST_OUTPUT_ON_FAILURE: 1
+        working-directory: ${{runner.workspace}}/build/src/common/
+        run: ctest
+
+      - name: Upload artifacts
+        id: upload-artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ matrix.config.artifact_prefix }}-rnnoise
+          path: |
+            ${{runner.workspace}}/build/bin
+            !**/*.lib
+          retention-days: 5
+          if-no-files-found: error

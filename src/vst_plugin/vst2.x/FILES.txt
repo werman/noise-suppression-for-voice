@@ -1,1 +1,0 @@
-Here should be files of the vst2 sdk from public.sdk/source/vst2.x/

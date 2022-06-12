@@ -733,16 +733,25 @@ namespace ladspa
         }
 #endif /* DOXYGEN_SHOULD_SKIP_THIS */
 
-        template<std::size_t id>
-        type_at<id> get() const {
-            type_at<id> ret_val = std::get<id>(storage);
+/* MSVC does compile the code below */
+//        template<std::size_t id>
+//        type_at<id> get() const {
+//            type_at<id> ret_val = std::get<id>(storage);
+//            // buffer size is usually not set - set it
+//            ret_val.set_size(_current_sample_count);
+//            return ret_val;
+//        }
+//        template<port_names_t id>
+//        type_at<(std::size_t)id> get() const {
+//            return get<(std::size_t)id>();
+//        }
+
+        template<port_names_t id>
+        type_at<(std::size_t)id> get() const {
+            type_at<(std::size_t)id> ret_val = std::get<(std::size_t)id>(storage);
             // buffer size is usually not set - set it
             ret_val.set_size(_current_sample_count);
             return ret_val;
-        }
-        template<port_names_t id>
-        type_at<(std::size_t)id> get() const {
-            return get<(std::size_t)id>();
         }
 
         //! lets you choose which buffers you want to iterate over
