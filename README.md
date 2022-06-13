@@ -16,7 +16,11 @@ The plugin is made to work with 1 channel and/or 2 channels (ladspa plugin), 16 
 
 To check or change mic settings go to "Recording devices" -> "Recording" -> "Properties" of the target mic -> "Advanced".
 
+Move librnnoise_vst.dll to C:\Program Files\EqualizerAPO\VSTPlugins.
+
 To enable the plugin in Equalizer APO select "Plugins" -> "VST Plugin" and specify the plugin dll.
+
+To change the VAD Threshold click the downward chevrons, select "Edit text", and input the following text: VSTPlugin: Library librnnoise_vst.dll "VAD Threshold" 0.95 (or any other value between 0 and 1, default is 0.50).
 
 See [detailed guide](https://medium.com/@bssankaran/free-and-open-source-software-noise-cancelling-for-working-from-home-edb1b4e9764e) provided by  [@bssankaran](https://github.com/bssankaran).
 
