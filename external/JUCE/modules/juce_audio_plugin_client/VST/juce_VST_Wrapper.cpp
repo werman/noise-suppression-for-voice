@@ -84,8 +84,11 @@ namespace Vst2
 // field in the Projucer. The VST2 SDK can be obtained from the
 // vstsdk3610_11_06_2018_build_37 (or older) VST3 SDK or JUCE version 5.3.2. You
 // also need a VST2 license from Steinberg to distribute VST2 plug-ins.
-#include "pluginterfaces/vst2.x/aeffect.h"
-#include "pluginterfaces/vst2.x/aeffectx.h"
+//#include "pluginterfaces/vst2.x/aeffect.h"
+//#include "pluginterfaces/vst2.x/aeffectx.h"
+#define _fstEffect AEffect
+#define FST2VST 1
+#include <fst.h>
 }
 
 JUCE_END_IGNORE_WARNINGS_MSVC
@@ -1345,7 +1348,7 @@ private:
             {
                 struct FlagPair
                 {
-                    Vst2::AudioMasterOpcodesX opcode;
+                    int opcode;
                     int bit;
                 };
 
