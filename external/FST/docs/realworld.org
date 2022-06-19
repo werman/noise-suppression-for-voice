@@ -1,0 +1,514 @@
+* JUCE host
+
+1. create
+   1. contructEffect
+      1. calls =VSTPluginMain= to get a plugin
+      2. checks =effect->magic=
+      3. checks =effect->resvd2!=0=
+   2. set =effect->resvd2= to 0
+   3. calls =effIdentify(0,0,NULL,0.))= (ignores result)
+   4. calls =effSetSampleRate(0,0,NULL,sampleRate)=
+   5. calls =effSetBlockSize(0,blockSize,NULL, 0.f)=
+   6. calls =effOpen(0,0,NULL,0.))=
+   7. queryBusIO
+      1. calls =effSetSpeakerArrangement(0, ?, ?, 0.f)=
+      2. getSpeakerArrangementWrapper
+         1. ?
+      3. =effGetInputProperties(ch=0..n, 0, &pinProps, 0.0f)=
+      4. =effGetOutputProperties(ch=0..n, 0, &pinProps, 0.0f)=
+   8. VSTPluginInstance
+      1. =effCanBeAutomated(param=0..n, 0, 0, 0, 0)=
+
+
+* REAPER host
+
+#+BEGIN_SRC C
+/* init */
+effect->dispatcher(effOpen, 0, 0, (nil), 0.000000);
+effect->dispatcher(effSetSampleRate, 0, 0, (nil), 44100.000000);
+effect->dispatcher(effSetBlockSize, 0, 512, (nil), 0.000000);
+effect->dispatcher(effGetEffectName, 0, 0, 0x7ffcf7237fc0, 0.000000);
+effect->dispatcher(effGetVendorString, 0, 0, 0x7ffcf7237fc0, 0.000000);
+effect->dispatcher(effCanDo, 0, 0, 0xab4617, 0.000000);
+effect->dispatcher(effCanDo, 0, 0, 0xab4af0, 0.000000);
+effect->dispatcher(effCanDo, 0, 0, 0xab4670, 0.000000);
+effect->dispatcher(effGetVstVersion, 0, 0, (nil), 0.000000);
+effect->dispatcher(effMainsChanged, 0, 1, (nil), 0.000000);
+effect->dispatcher(effStartProcess, 0, 0, (nil), 0.000000);
+effect->dispatcher(effCanDo, 0, 0, 0xab4684, 0.000000);
+effect->dispatcher(effCanDo, 0, 0, 0xab4695, 0.000000);
+effect->dispatcher(effGetPlugCategory, 0, 0, (nil), 0.000000);
+effect->dispatcher(effCanDo, 0, 0, 0xab46a9, 0.000000);
+effect->dispatcher(effCanDo, 0, 0, 0xab46b7, 0.000000);
+effect->dispatcher(effGetProgram, 0, 0, (nil), 0.000000);
+effect->dispatcher(effGetChunk, 0, 0, 0x7ffcf722fd10, 0.000000);
+effect->dispatcher(effSetProgram, 0, 0, (nil), 0.000000);
+effect->dispatcher(effGetProgramName, 0, 0, 0x7ffcf7237dc0, 0.000000);
+effect->dispatcher(effGetProgram, 0, 0, (nil), 0.000000);
+
+/* start playback */
+effect->dispatcher(effMainsChanged, 0, 0, (nil), 0.000000);
+effect->dispatcher(effMainsChanged, 0, 1, (nil), 0.000000);
+
+/* de-init */
+effect->dispatcher(effMainsChanged, 0, 0, (nil), 0.000000);
+effect->dispatcher(effMainsChanged, 0, 1, (nil), 0.000000);
+effect->dispatcher(effMainsChanged, 0, 0, (nil), 0.000000);
+effect->dispatcher(effMainsChanged, 0, 1, (nil), 0.000000);
+effect->dispatcher(StopProcess, 0, 0, (nil), 0.000000);
+effect->dispatcher(effMainsChanged, 0, 0, (nil), 0.000000);
+effect->dispatcher(effClose, 0, 0, (nil), 0.000000);
+#+END_SRC
+
+
+* REAPER plugins
+
+plugins that come with REAPER fail to instantiate.
+however, in the `VSTPluginMain` function they call the host
+with two callbacks:
+#+BEGIN_SRC C
+hostDispatcher(0, 0xDEADBEEF, 0xDEADFOOD, 0, "DB2SLIDER", 0.f);
+hostDispatcher(0, 0xDEADBEEF, 0xDEADFOOD, 0, "SLIDER2DB", 0.f);
+#+END_SRC
+
+I *think* that the plugin is asking for shared functions.
+At least, if we return a function pointer, the `reacomp.vst` plugin loads!
+
+we can then load the following plugins:
+- REAPER/Plugins/FX/reacomp.vst.so
+- REAPER/Plugins/FX/readelay.vst.so
+- REAPER/Plugins/FX/reagate.vst.so
+- REAPER/Plugins/FX/reasyndr.vst.so
+- REAPER/Plugins/FX/reasynth.vst.so
+- REAPER/Plugins/FX/reatune.vst.so
+- REAPER/Plugins/FX/reaverbate.vst.so
+- REAPER/Plugins/FX/reavocode.vst.so
+
+
+
+* Categories as reported by REAPER
+
+** Delay
+- ReaDelay
+** Dynamics
+- ReaComp
+- ReaXComp
+** EQ
+- ReaEQ
+** External
+- ReaCast
+- ReaInsert
+- ReaNINJAM
+- ReaStream (8ch)
+** Gate
+- ReaGate
+** MIDI
+- ReaControlMIDI
+** Pitch Correction
+- ReaPitch
+** Reverb
+- ReaVerb
+- ReaVerbate
+** Sampler
+- ReaSamplOmatic5000
+** Surround
+- ReaSurround
+** Synth
+- Digits
+- hypercyclic
+- tonespace
+- ReaSynDr
+- ReaSynth
+
+** Tools
+- ReaFir
+- ReaVocode
+- ReaVoice
+** Tuner
+- ReaTune
+
+
+
+* VstPinProperties
+
+#+BEGIN_SRC C++
+Vst2::VstPinProperties pinProps;
+if (dispatch (Vst2::effGetOutputProperties, index, 0, &pinProps, 0.0f) != 0)
+  return String (pinProps.label, sizeof (pinProps.label));
+#+END_SRC
+
+** VstPinProperties.flags
+
+if (kVstPinUseSpeaker): layout=VstPinProperties.arrangementType
+else if (kVstPinIsStereo): layout=stereo
+else: layout=mono
+
+** VstPinProperties.arrangementType
+->  SpeakerMappings::vstArrangementTypeToChannelSet
+
+SpeakerMappings::vstArrangementTypeToChannelSet (pinProps.arrangementType, 0);
+const Vst2::VstSpeakerArrangement* arr = (isInput ? inArr : outArr);
+layout = SpeakerMappings::vstArrangementTypeToChannelSet (*arr);
+
+
+#+BEGIN_SRC C
+struct {
+  char label[64];
+  int flags;
+  int arrangmentType;
+  char shortLabel[8];
+}
+#+END_SRC
+
+has =arrangementType=0; flags=3= for our "normal" test plugins
+and =arrangementType=1; flags=2= for our the reaper plugins
+
+this probably means:
+
+kVstPinIsActive=1;
+kVstPinUseSpeaker=2;
+kSpeakerArrMono=0;
+
+
+* Flags and Double
+
+| plugin             |        process |      replacing |     replacing2 |
+|--------------------+----------------+----------------+----------------|
+| BowEcho            | 0x7fa99438edc0 | 0x7fa99438edd0 | 0x7fa99438ede0 |
+| Danaides           | 0x7f69e5e5a940 | 0x7f69e5e5a950 | 0x7f69e5e5a960 |
+| DigitsVST_64       | 0x7f549efad620 | 0x7f549efacc80 | 0x7f549efad650 |
+| hypercyclic        | 0x7f9217a2a9be | 0x7f9217a2a9ce | 0x7f9217a2a9dc |
+| InstaLooperVST-x64 | 0x7f7504284660 | 0x7f7504284670 | 0x7f7504284680 |
+| Protoverb.64       | 0x7f2c0ed37d70 | 0x7f2c0ed37d80 | 0x7f2c0ed37d90 |
+| tonespace          | 0x7f7f723159be | 0x7f7f723159ce | 0x7f7f723159dc |
+|--------------------+----------------+----------------+----------------|
+| reacomp            | 0x7febc27162e0 | 0x7febc27162e0 | 0x7febc271cea0 |
+| readelay           | 0x7f3624b55820 | 0x7f3624b55820 | 0x7f3624b59940 |
+| reagate            | 0x7fa4303f2cf0 | 0x7fa4303f2cf0 | 0x7fa4303f7fd0 |
+| reasyndr           | 0x7f0de838a220 | 0x7f0de838a300 |          (nil) |
+| reasynth           | 0x7f60ca2d1020 | 0x7f60ca2d3330 |          (nil) |
+| reaverbate         | 0x7f7d1d15e5c0 | 0x7f7d1d15e5c0 | 0x7f7d1d15e640 |
+| reavocode          | 0x7fcc4ab2a130 | 0x7fcc4ab2a130 | 0x7fcc4ab2a1d0 |
+
+
+| plugin             | flags             |
+|--------------------+-------------------|
+| Protoverb.64       | 00000000 00110001 |
+| DigitsVST_64       | 00000001 00110000 |
+| InstaLooperVST-x64 | 00000000 00010001 |
+| BowEcho            | 00000010 00110001 |
+| Danaides           | 00000010 00110001 |
+| hypercyclic        | 00000011 00110001 |
+| tonespace          | 00000011 00110001 |
+|--------------------+-------------------|
+| reacomp            | 00010000 00010001 |
+| readelay           | 00010000 00110001 |
+| reagate            | 00010000 00010001 |
+| reasyndr           | 00000001 00010001 |
+| reasynth           | 00000001 00010001 |
+| reaverbate         | 00010000 00010001 |
+| reavocode          | 00010000 00110001 |
+|--------------------+-------------------|
+| FLAGS              | ___C__98 __54___0 |
+
+
+| flag                       |   | value | notes                        |
+|----------------------------+---+-------+------------------------------|
+| effFlagsHasEditor          | 0 | 1<< 0 |                              |
+| effFlagsProgramChunks      | 5 | 1<< 5 |                              |
+| effFlagsIsSynth            | 8 | 1<< 8 |                              |
+|----------------------------+---+-------+------------------------------|
+| effFlagsCanDoubleReplacing | C | 1<<12 |                              |
+| effFlagsCanReplacing       | 4 | 1<<4  |                              |
+| effFlagsNoSoundInStop      | 9 | 1<<9  |                              |
+|----------------------------+---+-------+------------------------------|
+|                            | 4 |       | ALL                          |
+|                            | 9 |       | JUCE                         |
+|                            | C |       | only reaper (except reasyn*) |
+|                            |   |       |                              |
+
+
+* effCode:56
+
+REAPER calls =opcode:56= with a =ptr= that points to a zeroed-out memory region.
+
+** size of zero-memory
+first non-zero byte @
+- 0x99, danach 4D D1 9B 99 06 CC 0C
+- 0x99, danach 6A 7B 8C 9A 80 71 F8
+- 0x99, danach FE 2A 66 F0 46 D2 02
+
+
+* 64bit vs 32bit
+
+FstClient::dispatcher(0x1ec2080, 42, 0, 32252624, 0x1ec2740, 0.000000)...  0x1ec22d0
+FstClient::dispatcher(0x9e36510, 42, 0, 172519840, 0xa487610, 0.000000)... 0xa4871a0
+
+
+dispatch4host(0x1ec2080, audioMasterGetTime, 0, 0, 0x7ffe4d90d2c0, 0.000000)
+dispatch4host: 32248472 (0x1EC1298)
+
+dispatch4host(0x9e36510, audioMasterGetTime, 0, 18443692774323650560, (nil), -nan)
+dispatch4host: 740955491651839768 (0xFFF5285800000000)
+
+
+** VstEvents
+
+- 32bit: =02000000 00 00 00 00  68F9F1ED 88F9F1ED=
+- 64bit: =02000000 00 00 00 00  00 00 00 00 00 00 00 00  806E00146C7F0000 A06E00146C7F0000=
+
+
+* Time/SMTP
+
+** 30/1 fps
+
+#+BEGIN_SRC C
+VstTimeInfo @ 0x18230c8
+	flags: 0
+	smpteFrameRate: 12034
+	smpteOffset: -1
+	currentBar: 2
+	magic: 0xDEADBEEF
+#+END_SRC
+
+#+BEGIN_SRC C
+VstTimeInfo @ 0x16c50a8
+	flags: 0
+	smpteFrameRate: 12034
+	smpteOffset: -1
+	currentBar: 3
+	magic: 0xDEADBEEF
+#+END_SRC
+
+
+** fps 30/1
+#+BEGIN_SRC C
+  04 00 00 00 04 00 00 00  0B 00 00 00 EF BE AD DE
+  00 00 00 00 02 2F 00 00  FF FF FF FF 00 02 00 00
+#+END_SRC
+
+** fps 24/1
+#+BEGIN_SRC C
+  04 00 00 00 04 00 00 00  08 00 00 00 EF BE AD DE
+  00 00 00 00 02 2F 00 00  FF FF FF FF 00 02 00 00
+#+END_SRC
+
+** fps 25/1
+#+BEGIN_SRC C
+  04 00 00 00 04 00 00 00  02 00 00 00 EF BE AD DE
+  00 00 00 00 02 2F 00 00  FF FF FF FF 00 02 00 00
+#+END_SRC
+
+#+BEGIN_SRC C
+#+END_SRC
+
+
+** flags
+
+| flags       |     flags(bin) | description   |
+|-------------+----------------+---------------|
+| 00 2f 00 00 | 10111100000000 | pause         |
+| 02 2f 00 00 | 10111100000010 | playing       |
+| 0a 2f 00 00 | 10111100001010 | recording     |
+| 06 3f 00 00 | 11111100000110 | looping       |
+| 01 2f 00 00 | 10111100000001 | stopping      |
+| 03 2f 00 00 | 10111100000011 | starting play |
+| 07 3f 00 00 | 11111100000111 | starting loop |
+
+| flags(bin)      | description   |
+|-----------------+---------------|
+| 101111 00000000 | pause         |
+| 101111 00000010 | playing       |
+| 111111 00000110 | looping       |
+| 101111 00000001 | stopping      |
+| 101111 00000011 | starting play |
+| 111111 00000111 | starting loop |
+| 101111 00001010 | recording     |
+|                 |               |
+
+| flags                      | value |
+|----------------------------+-------|
+| `kVstTransportChanged`     | 1<<0  |
+| `kVstTransportPlaying`     | 1<<1  |
+| `kVstTransportCycleActive` | 1<<2  |
+| `kVstTransportRecording`   | 1<<3  |
+|                            |       |
+
+| flag              | valid   |
+|-------------------+---------|
+| kVstCyclePosValid | looping |
+| kVstBarsValid     | yes     |
+| kVstPpqPosValid   | yes     |
+| kVstTempoValid    | yes     |
+| kVstTimeSigValid  | yes     |
+| kVstClockValid    | ?       |
+| kVstNanosValid    | ?       |
+| kVstSmpteValid    | ?-      |
+|                   |         |
+
+
+* MrWatson
+
+# plugin asked for time in nanoseconds
+# Plugin requested position in bars, but not PPQ
+
+|   flag | binary | warning                                |
+|--------+--------+----------------------------------------|
+| 0x0100 | 1<< 8  | "plugin asked for time in nanoseconds" |
+| 0x0200 | 1<< 9  | flags=0x0203; ppqPos                   |
+| 0x0400 | 1<<10  | flags=0x0403; tempo                    |
+| 0x0800 | 1<<11  | flags=0x0803; barStartPos              |
+| 0x2000 | 1<<13  | flags=0x2003; timeSig...               |
+| 0x4000 | 1<<14  | "Current time in SMPTE format"         |
+| 0x8000 | 1<<15  | "Sample frames until next clock"       |
+
+|   flag | binary | @54-57 | set data                            |
+|--------+--------+--------+-------------------------------------|
+| 0x0200 | 1<< 9  | 0x0203 | ppqPos                              |
+| 0x0400 | 1<<10  | 0x0403 | tempo                               |
+| 0x0800 | 1<<11  | 0x0803 | barStartPos                         |
+| 0x2000 | 1<<13  | 0x2003 | timeSigNumerator/timeSigDenominator |
+|        |        |        |                                     |
+
+| flag                       | value |
+|----------------------------+-------|
+| `kVstTransportChanged`     | 1<< 0 |
+| `kVstTransportPlaying`     | 1<< 1 |
+| `kVstTransportCycleActive` | 1<< 2 |
+| `kVstTransportRecording`   | 1<< 3 |
+|----------------------------+-------|
+| `kVstNanosValid`           | 1<< 8 |
+| `kVstPpqPosValid`          | 1<< 9 |
+| `kVstTempoValid`           | 1<<10 |
+| `kVstBarsValid`            | 1<<11 |
+| `kVstCyclePosValid`        | 1<<12 |
+| `kVstTimeSigValid`         | 1<<13 |
+
+
+** Protoverb
+
+#+BEGIN_BLOCK
+Protoverb VST telling MrsWatson about 16 samples latency
+UNSUPPORTED FEATURE: VST master opcode audioMasterIOChanged
+  This feature is not yet supported. Please help us out and submit a patch! :)
+  Project website: https://github.com/teragonaudio/mrswatson
+  Support email: support@teragonaudio.com
+- 00061952 000181 Finished processing input source
+#+END_BLOCK
+
+where FstHost tells us:
+
+#+BEGIN_BLOCK
+sending latency to host... 16
+Protoverb VST telling FstProduct? about 16 samples latency
+FstHost::dispatcher[0](13, 0, 0, (nil), 0.000000)
+	dyspatcher(0x5611057e4bf0, 13, 0, 0, (nil), 0.000000);
+#+END_BLOCK
+
+** BowEcho/Danaides
+
+#+BEGIN_BLOCK
+UNSUPPORTED FEATURE: Current time in SMPTE format
+  This feature is not yet supported. Please help us out and submit a patch! :)
+  Project website: https://github.com/teragonaudio/mrswatson
+  Support email: support@teragonaudio.com
+#+END_BLOCK
+
+** tonespace
+
+#+BEGIN_BLOCK
+- 00000000 000000 Opening VST2.x plugin '/Net/iem/Benutzer/zmoelnig/src/iem/FST/tmp/vst64/hypercyclic/hypercyclic.so'
+UNSUPPORTED FEATURE: Current time in SMPTE format
+  This feature is not yet supported. Please help us out and submit a patch! :)
+  Project website: https://github.com/teragonaudio/mrswatson
+  Support email: support@teragonaudio.com
+#+END_BLOCK
+
+** hypercyclic
+
+#+BEGIN_BLOCK
+- 00000000 000000 Opening VST2.x plugin '/Net/iem/Benutzer/zmoelnig/src/iem/FST/tmp/vst64/hypercyclic/hypercyclic.so'
+unknown display value id=D
+unknown display value id=B
+UNSUPPORTED FEATURE: Current time in SMPTE format
+  This feature is not yet supported. Please help us out and submit a patch! :)
+  Project website: https://github.com/teragonaudio/mrswatson
+  Support email: support@teragonaudio.com
+#+END_BLOCK
+
+
+* vstplugin~
+
+** TODO
+| opcode                      | ? |
+|-----------------------------+---|
+| audioMasterIdle             |   |
+|-----------------------------+---|
+| effEditIdle                 |   |
+| effBeginSetProgram          |   |
+| effEndSetProgram            |   |
+| effGetNumMidiInputChannels  |   |
+| effGetNumMidiOutputChannels |   |
+| effGetTailSize              |   |
+| effSetBypass                |   |
+| effString2Parameter         |   |
+|-----------------------------+---|
+| kVstAutomationReading       |   |
+| kVstAutomationWriting       |   |
+
+** DONE
+| opcode                 |    |
+|------------------------+----|
+|                        |    |
+|------------------------+----|
+| effSetProcessPrecision | 77 |
+|------------------------+----|
+| kVstProcessPrecision32 |  0 |
+| kVstProcessPrecision64 |  1 |
+|                        |    |
+
+
+* AudioPluginHost
+
+** TODO
+| opcode            | value | notes   |
+|-------------------+-------+---------|
+| effCanBeAutomated |       |         |
+| effConnectInput   |       |         |
+| effConnectOutput  |       |         |
+| effKeysRequired   |       |         |
+| effSetBypass      |       | BowEcho |
+|-------------------+-------+---------|
+| audioHost???      |     3 |         |
+| audioHost???      |    13 |         |
+| audioHost???      |    42 |         |
+
+
+
+* REAPER
+
+** TODO
+| opcode | value | commen                   |
+|--------+-------+--------------------------|
+| eff??? |    19 | immer abwechselnd mit 53 |
+| eff??? |    53 |                          |
+|--------+-------+--------------------------|
+|        |    56 |                          |
+|        |    62 |                          |
+
+
+* FstHost
+
+| opcode                      | value |   return | plugins |
+|-----------------------------+-------+----------+---------|
+|                             |    26 |        1 | *       |
+|                             |    44 |        1 | JUCE    |
+| effGetCurrentMidiProgram?   |    63 |       -1 | *       |
+| effSetTotalSampleToProcess? |    73 | <ivalue> |         |
+|                             |    78 |        1 | Digits  |
+|                             |       |          |         |
+
+
+* u-he
+
+- 'u-he doesn't use key [...]'

@@ -1,0 +1,16 @@
+LIBS=
+
+FST_CPPFLAGS=-I../../fst -I.. -DFST_DONT_DEPRECATE_UNKNOWN=1
+FST_CXXFLAGS=-g -O0
+
+archs: w32/FstHost.exe w64/FstHost.exe
+
+w32/FstHost.exe: CXX=i686-w64-mingw32-g++
+w64/FstHost.exe: CXX=x86_64-w64-mingw32-g++
+
+FstHost.exe w32/FstHost.exe w64/FstHost.exe: FstHost.cpp ../../fst/fst.h ../fst_utils.h
+	$(CXX) $(FST_CPPFLAGS) $(CPPFLAGS) $(FST_CXXFLAGS) $(CXXFLAGS) $(ARCHFLAGS) $< -o $@ $(LIBS)
+
+.PHONY: clean archs default
+clean:
+	rm -f *.exe */*.exe

@@ -1,0 +1,44 @@
+#######################################################################
+### .git-ci/gitlab-iem.yml for FST
+###
+### simple SDK-checks: preprocessor,...
+#######################################################################
+
+.preprocessor:
+  stage: build
+  artifacts:
+    untracked: true
+    when: always
+  script:
+    - cpp --version
+    - make -C tests all preproc
+
+linux:
+  extends: .preprocessor
+  image: registry.git.iem.at/devtools/docker/debiancross:amd64
+
+macos:
+  extends: .preprocessor
+  tags:
+    - osx
+
+w64:
+  extends: .preprocessor
+  tags:
+    - windows
+  variables:
+    IEMCI_CONFIGURATIONS: mingw64
+
+w32:
+  extends: w64
+  variables:
+    IEMCI_CONFIGURATIONS: mingw32
+
+msvc:
+  extends: .preprocessor
+  tags:
+    - windows
+  script:
+    - cd tests
+    - nmake -f makefile.msvc preproc || true
+    - nmake -f makefile.msvc

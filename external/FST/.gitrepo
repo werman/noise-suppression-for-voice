@@ -1,0 +1,12 @@
+; DO NOT EDIT (unless you know what you are doing)
+;
+; This subdirectory is a git "subrepo", and this file is maintained by the
+; git-subrepo command. See https://github.com/git-commands/git-subrepo#readme
+;
+[subrepo]
+	remote = https://git.iem.at/zmoelnig/FST.git
+	branch = master
+	commit = 58a8e128229c242cafef8d169b11ace750f1fbc6
+	parent = bc21e61166ba00477365d6be5e918e6e82b3b6d8
+	method = merge
+	cmdver = 0.4.3

@@ -1,0 +1,258 @@
+
+* opcode tables
+
+** host
+
+| opcode | value                                  | notes                                                                        |
+|--------+----------------------------------------+------------------------------------------------------------------------------|
+|      0 | audioMasterAutomate                    |                                                                              |
+|      1 | audioMasterVersion                     | :JUCE returns 2400                                                           |
+|      2 | audioMasterCurrentId?                  | :REAPER returns 0xDEAD                                                       |
+|      2 | ?                                      | :REAPER-plugins call this in the ctor                                        |
+|      6 | ?                                      | :called as response to effCode:12 with ivalue=1                              |
+|      6 | ?                                      | :REAPER returns 1                                                            |
+|      7 | audioMasterGetTime                     | :called by hypercyclic/tonespace as response to effCode:12 with ivalue=65024 |
+|      7 | audioMasterGetTime                     | :REAPER returns an address                                                   |
+|      8 | audioMasterProcessEvents               | :REAPER returns 1                                                            |
+|        |                                        | :REAPER crashes with tained VstEvents-data                                   |
+|     10 | audioMasterTempoAt                     |                                                                              |
+|     11 | ?                                      | :REAPER returns 0x10000 (65536)                                              |
+|     12 | ?                                      | :REAPER returns 1                                                            |
+|     13 | ?                                      | :called with 0-args in Protoverb:main and hypercyclic:eff:12                 |
+|    13? | ?                                      | :Protoverb calls in main (and as response to effcode:30514?)                 |
+|     16 | audioMasterGetSampleRate               |                                                                              |
+|     17 | audioMasterGetBlockSize                |                                                                              |
+|     19 | ?                                      | :REAPER returns 0x2800,  0x33FF, 0x2FFF, 0x3400, 0x3000 when called...       |
+|        |                                        | :...repeatedly while handling effCode:25 (args are ignored)                  |
+|     23 | ?                                      | :called by JUCE-plugins with 0-args as response to effCode:12                |
+|     32 | audioMasterGetVendorString             |                                                                              |
+|     33 | audioMasterGetProductString            |                                                                              |
+|     34 | audioMasterGetVendorVersion            | :JUCE returns 0x0101 (257)                                                   |
+|     37 | audioMasterCanDo                       |                                                                              |
+|     42 | ?                                      | :Protoverb calls as response to effSetProgramName                            |
+|     43 | ?                                      | :called by JUCE-plugins with index of a GUI-changed parameter (no more args) |
+|     44 | ?                                      | :called by JUCE-plugins with index of a GUI-changed parameter (no more args) |
+|     48 | audioMasterGetDirectory?               | :REAPER returns filename of reaper-project file (.RPP)                       |
+|--------+----------------------------------------+------------------------------------------------------------------------------|
+|        | audioMasterWantMidi                    |                                                                              |
+|        | audioMasterCanDo                       |                                                                              |
+|        | audioMasterCurrentId?                  |                                                                              |
+|        | audioMasterGetDirectory?               |                                                                              |
+|        | audioMasterBeginEdit                   |                                                                              |
+|        | audioMasterEndEdit                     |                                                                              |
+|        | audioMasterSizeWindow                  |                                                                              |
+|        | audioMasterUpdateDisplay               |                                                                              |
+|        | audioMasterGetCurrentProcessLevel      |                                                                              |
+|        | audioMasterGetAutomationState          |                                                                              |
+|        | audioMasterGetNumAutomatableParameters |                                                                              |
+|        | audioMasterIdle                        |                                                                              |
+|        | audioMasterIOChanged                   |                                                                              |
+|        | audioMasterNeedIdle                    |                                                                              |
+|        | audioMasterPinConnected                |                                                                              |
+|        | audioMasterSetOutputSampleRate         |                                                                              |
+|--------+----------------------------------------+------------------------------------------------------------------------------|
+|        | audioMasterGetLanguage                 | JUCE-ignore                                                                  |
+|        | audioMasterGetOutputSpeakerArrangement | JUCE-ignore                                                                  |
+|        | audioMasterGetParameterQuantization    | JUCE-ignore                                                                  |
+|        | audioMasterGetPreviousPlug             | JUCE-ignore                                                                  |
+|        | audioMasterGetNextPlug                 | JUCE-ignore                                                                  |
+|        | audioMasterSetTime                     | JUCE-ignore                                                                  |
+|        | audioMasterWillReplaceOrAccumulate     | JUCE-ignore                                                                  |
+|        | audioMasterGetInputLatency             | JUCE-ignore                                                                  |
+|        | audioMasterGetOutputLatency            | JUCE-ignore                                                                  |
+|        | audioMasterOpenWindow                  | JUCE-ignore                                                                  |
+|        | audioMasterCloseWindow                 | JUCE-ignore                                                                  |
+|        | audioMasterSetIcon                     | JUCE-ignore                                                                  |
+|        | audioMasterOfflineGetCurrentMetaPass   | JUCE-ignore                                                                  |
+|        | audioMasterOfflineGetCurrentPass       | JUCE-ignore                                                                  |
+|        | audioMasterOfflineRead                 | JUCE-ignore                                                                  |
+|        | audioMasterOfflineStart                | JUCE-ignore                                                                  |
+|        | audioMasterOfflineWrite                | JUCE-ignore                                                                  |
+|        | audioMasterVendorSpecific              | JUCE-ignore                                                                  |
+|        |                                        |                                                                              |
+
+
+
+** plugin
+
+
+|     opcode | value                       | notes                                                              |
+|------------+-----------------------------+--------------------------------------------------------------------|
+|          0 | effOpen                     | :REAPER calls with 0 (at the very beginning)                       |
+|          1 | effClose                    | :CRASH                                                             |
+|            |                             | :REAPER calls with 0 (at the very end)                             |
+|          2 | effSetProgram               | set program# via ivalue                                            |
+|          3 | effGetProgram               | returns current program#                                           |
+|          4 | effSetProgramName           | :needs a valid ptr, Protoverb calls hostCode:42                    |
+|          5 | effGetProgramName           | writes current program name into ptr                               |
+|          6 | effGetParamLabel            | unit (e.g. "dB")                                                   |
+|          7 | effGetParamDisplay          | string representation of current value (e.g. "-23")                |
+|          8 | effGetParamName             | human readable name (e.g. "Gain")                                  |
+|          9 |                             |                                                                    |
+|         10 | effSetSampleRate            | :Protoverb prints "AM_AudioMan::reset()"                           |
+|         11 | effSetBlockSize             |                                                                    |
+|         12 | effMainsChanged             | :Protoverb does resume/reset and calls hostCode:6                  |
+|            |                             | :Digits calls hostCode:6                                           |
+|            |                             | :BowEcho/Danaides calls hostCode:23+6                              |
+|            |                             | :hypercyclic/tonespace calls hostCode:23+7+6                       |
+|            |                             | :REAPER calls with ivalue=1/0                                      |
+|         13 | effEditGetRect              | :Protoverb prints "AM_VST_Editor::getRect" and CRASH               |
+|         14 | effEditOpen                 | :Protoverb prints "AM_VST_Editor::open" and EXIT                   |
+|         15 | effEditClose                | :Protoverb prints "closed editor."                                 |
+|         22 | effIdentify                 | :Protoverv returns 0x4E764566                                      |
+|         23 | effGetChunk                 | :Protoverb returns 0x317 (or 0x307) and writes an address into ptr |
+|         24 | effSetChunk                 | :Protoverb returns 1                                               |
+|         25 | effProcessEvents            | :Protoverb returns 1                                               |
+|         26 |                             | :Protoverb returns 1                                               |
+|         29 | effGetProgramNameIndexed    | :Protoverb returns 1 and ptr:"initialize"                          |
+|         33 | effGetInputProperties       | :Protoverb returns 1 and ptr:"Protoverb-In0"                       |
+|         34 | effGetOutputProperties      | :Protoverb returns 1 and ptr:"Protoverb-Out0"                      |
+|         35 | effGetPlugCategory          | :JUCE RETURNS VstPlugCategory                                      |
+|         35 |                             | :REAPER calls with 0                                               |
+|            |                             | :InstaLooper returns 0                                             |
+|            |                             | :Protoverb/BowEcho/Danaides/reacom.vst returns 1                   |
+|            |                             | :Digits/hypercyclic/tonespace returns 2                            |
+|         41 |                             | :crashes when called with (0,0,"name41",0)                         |
+|         45 | effGetEffectName            | :Protoverb returns 1 and ptr:"Protoverb"                           |
+|         47 | effGetVendorString          | :Protoverb returns 1 and ptr:"u-he"; prints getVendorString()      |
+|         48 | effGetProductString         | :Protoverb returns 1 and ptr:"Protoverb 1.0.0"                     |
+|         49 | effGetVendorVersion         | :Protoverb returns 0x10000                                         |
+|         50 | effVendorSpecific           | :REAPER only calls this is 'hasCockosExtensions' is supported      |
+|         51 | effCanDo                    | :Protoverb returns 0xFFFFFFFFFFFFFFFF (with ptr:"")                |
+|         56 |                             | :REAPER calls with ptr to zeroed memory                            |
+|            |                             | :all return 0                                                      |
+|         58 | effGetVstVersion            | :Protoverb returns 2400 (0x960)                                    |
+|         59 | effKeysRequired?            | :Protoverb prints "u-he plugin doesn't use key"                    |
+|         63 |                             | :Protoverb returns  0xFFFFFFFFFFFFFFFF (with ptr:"")               |
+|         71 |                             | :REAPER calls with 0                                               |
+|            |                             | :Protoverb returns 1, rest returns 0                               |
+|         72 |                             | :REAPER calls with 0                                               |
+|         77 | effSetProcessPrecision      | :REAPER calls with 1                                               |
+|            |                             | :Protoverb returns 1, rest returns 0                               |
+|      30514 |                             | :Protoverb calls hostCode:13                                       |
+| 0xdeadbeef |                             | :REAPER ask for function?                                          |
+|------------+-----------------------------+--------------------------------------------------------------------|
+|            | effGetTailSize              |                                                                    |
+|            | effGetCurrentMidiProgram    |                                                                    |
+|            | effGetSpeakerArrangement    |                                                                    |
+|            | effGetNumMidiInputChannels  |                                                                    |
+|            | effGetNumMidiOutputChannels |                                                                    |
+|            |                             |                                                                    |
+|            | effCanBeAutomated           | :takes index                                                       |
+|            | effString2Parameter         |                                                                    |
+|            | effSetSpeakerArrangement    |                                                                    |
+|            | effSetBypass                |                                                                    |
+|            | effSetTotalSampleToProcess  |                                                                    |
+|            | effConnectInput             |                                                                    |
+|            | effConnectOutput            |                                                                    |
+|            | effIdle                     |                                                                    |
+|            | effShellGetNextPlugin       |                                                                    |
+|            | effStartProcess             |                                                                    |
+|            | effStopProcess              |                                                                    |
+|            | effEditDraw                 |                                                                    |
+|            | effEditMouse                |                                                                    |
+|            | effEditSleep                |                                                                    |
+|            | effEditTop                  |                                                                    |
+|            | effEditIdle                 |                                                                    |
+
+** flags
+
+| bit | name                       | notes                 |
+|-----+----------------------------+-----------------------|
+|   1 | effFlagsHasEditor          |                       |
+|   2 |                            | always 0              |
+|   3 |                            | always 0              |
+|   4 |                            | always 0              |
+|   5 | ??                         | always 1              |
+|   6 | ??                         | InstaLooper=0, else 1 |
+|   7 |                            | always 0              |
+|   8 |                            | always 0              |
+|   9 | effFlagsIsSynth            |                       |
+|  10 | ??                         |                       |
+|  11 |                            | always 0              |
+|  12 |                            | always 0              |
+|  13 |                            | always 0              |
+|  14 |                            | always 0              |
+|  15 |                            | always 0              |
+|  16 |                            | always 0              |
+|-----+----------------------------+-----------------------|
+|   ? | effFlagsCanDoubleReplacing |                       |
+|   ? | effFlagsCanReplacing       |                       |
+|   ? | effFlagsNoSoundInStop      |                       |
+|   ? | effFlagsProgramChunks      |                       |
+
+
+* Host opcodes and how they are handled by JUCE
+
+
+| audioMaster-opcode                     | IN               | OUT         |           return | notes                                                           |
+|----------------------------------------+------------------+-------------+------------------+-----------------------------------------------------------------|
+| audioMasterAutomate                    | index, fvalue    | -           |                0 |                                                                 |
+| audioMasterProcessEvents               | ptr(VstEvents*)) | -           |                0 |                                                                 |
+| audioMasterGetTime                     | -                | -           |         &vsttime |                                                                 |
+| audioMasterIdle                        | -                | -           |                0 |                                                                 |
+| audioMasterSizeWindow                  | index, value     |             |                1 | setWindowSize(index,value)                                      |
+| audioMasterUpdateDisplay               | -                | -           |                0 | triggerAsyncUpdate()                                            |
+| audioMasterIOChanged                   | -                | -           |                0 | setLatencyDelay                                                 |
+| audioMasterNeedIdle                    | -                | -           |                0 | startTimer(50)                                                  |
+| audioMasterGetSampleRate               | -                | -           |       samplerate |                                                                 |
+| audioMasterGetBlockSize                | -                | -           |        blocksize |                                                                 |
+| audioMasterWantMidi                    | -                | -           |                0 | wantsMidi=true                                                  |
+| audioMasterGetDirectory                | -                | -           | (char*)directory |                                                                 |
+| audioMasterTempoAt                     | -                | -           |        10000*bpm |                                                                 |
+| audioMasterGetAutomationState          | -                | -           |        0/1/2/3/4 | 0 = not supported, 1 = off, 2 = read, 3 = write, 4 = read/write |
+| audioMasterBeginEdit                   | index            | -           |                0 | gesture                                                         |
+| audioMasterEndEdit                     | index            | -           |                0 | gesture                                                         |
+| audioMasterPinConnected                | index,value      | -           |              0/1 | 0=true; value=direction                                         |
+| audioMasterGetCurrentProcessLevel      | -                | -           |              4/0 | 4 if not realtime                                               |
+|----------------------------------------+------------------+-------------+------------------+-----------------------------------------------------------------|
+| audioMasterCanDo                       | ptr(char[])      | -           |              1/0 | 1 if we can handle feature                                      |
+| audioMasterVersion                     | -                | -           |             2400 |                                                                 |
+| audioMasterCurrentId                   | -                | -           | shellUIDToCreate |                                                                 |
+| audioMasterGetNumAutomatableParameters | -                | -           |                0 |                                                                 |
+| audioMasterGetVendorVersion            | -                | -           |           0x0101 |                                                                 |
+| audioMasterGetVendorString             | -                | ptr(char[]) |              ptr | getHostName()                                                   |
+| audioMasterGetProductString            | -                | ptr(char[]) |              ptr | getHostName()                                                   |
+| audioMasterSetOutputSampleRate         | -                | -           |                0 |                                                                 |
+|----------------------------------------+------------------+-------------+------------------+-----------------------------------------------------------------|
+| audioMasterGetLanguage                 |                  |             |                  | JUCE-ignore                                                     |
+| audioMasterGetOutputSpeakerArrangement |                  |             |                  | JUCE-ignore                                                     |
+| audioMasterGetParameterQuantization    |                  |             |                  | JUCE-ignore                                                     |
+| audioMasterGetPreviousPlug             |                  |             |                  | JUCE-ignore                                                     |
+| audioMasterGetNextPlug                 |                  |             |                  | JUCE-ignore                                                     |
+| audioMasterSetTime                     |                  |             |                  | JUCE-ignore                                                     |
+| audioMasterWillReplaceOrAccumulate     |                  |             |                  | JUCE-ignore                                                     |
+| audioMasterGetInputLatency             |                  |             |                  | JUCE-ignore                                                     |
+| audioMasterGetOutputLatency            |                  |             |                  | JUCE-ignore                                                     |
+| audioMasterOpenWindow                  |                  |             |                  | JUCE-ignore                                                     |
+| audioMasterCloseWindow                 |                  |             |                  | JUCE-ignore                                                     |
+| audioMasterSetIcon                     |                  |             |                  | JUCE-ignore                                                     |
+| audioMasterOfflineGetCurrentMetaPass   |                  |             |                  | JUCE-ignore                                                     |
+| audioMasterOfflineGetCurrentPass       |                  |             |                  | JUCE-ignore                                                     |
+| audioMasterOfflineRead                 |                  |             |                  | JUCE-ignore                                                     |
+| audioMasterOfflineStart                |                  |             |                  | JUCE-ignore                                                     |
+| audioMasterOfflineWrite                |                  |             |                  | JUCE-ignore                                                     |
+| audioMasterVendorSpecific              |                  |             |                  | JUCE-ignore                                                     |
+|                                        |                  |             |                  |                                                                 |
+
+
+* effcode:12 effMainsChanged
+
+** JUCE resume
+   - isProcessLevelOffline()
+     - hostCallback (&vstEffect, Vst2::audioMasterGetCurrentProcessLevel, 0, 0, 0, 0);
+   - deleteTempChannels()
+   - hostCallback (&vstEffect, Vst2::audioMasterWantMidi, 0, 1, 0, 0);
+   -
+
+
+23/autioMasterGetTime/6
+- 23: audioMasterGetCurrentProcessLevel
+-  6: audioMasterWantMidi
+
+
+| opcode                            | value |
+|-----------------------------------+-------|
+| effMainsChanged                   |    12 |
+| audioMasterWantMidi               |     6 |
+| audioMasterGetCurrentProcessLevel |    23 |

@@ -1,0 +1,13 @@
+CFLAGS=-I..
+CXXFLAGS=-I..
+CPPFLAGS=-I..
+
+all: c_test.obj cxx_test.obj
+
+# hmm, whats a good suffix for preprocessed files?
+.SUFFIXES: .i .ii
+preproc: c_test.i cxx_test.ii
+.cpp.ii:
+        $(CXX) /E $(CXXFLAGS) $< >$@
+.c.i:
+        $(CC) /E $(CFLAGS) $< >$@
