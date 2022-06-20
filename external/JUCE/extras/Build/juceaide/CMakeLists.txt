@@ -39,7 +39,7 @@ if(JUCE_BUILD_HELPER_TOOLS)
     target_link_libraries(juceaide PRIVATE
         juce::juce_build_tools
         juce::juce_recommended_config_flags
-        juce::juce_recommended_lto_flags
+#        juce::juce_recommended_lto_flags
         juce::juce_recommended_warning_flags)
 
     set_target_properties(juceaide PROPERTIES
