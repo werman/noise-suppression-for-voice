@@ -94,5 +94,6 @@ jobs:
           path: |
             ${{runner.workspace}}/build/bin
             !**/*.lib
+            !**/*.pdb
           retention-days: 5
           if-no-files-found: error
