@@ -10,6 +10,11 @@ RnNoiseAudioProcessorEditor::RnNoiseAudioProcessorEditor(RnNoiseAudioProcessor &
         : AudioProcessorEditor(&p), m_valueTreeState(vts), m_processorRef(p) {
     juce::ignoreUnused(m_processorRef);
 
+    addAndMakeVisible(m_headerLabel);
+    m_headerLabel.setText("Noise Suppressor for Voice", juce::dontSendNotification);
+    m_headerLabel.setFont(juce::Font(26.0f, juce::Font::bold | juce::Font::underlined));
+    m_headerLabel.setJustificationType(juce::Justification::centred);
+
     auto vadThresholdParam = m_processorRef.m_parameters.getParameter("vad_threshold");
     auto vadGracePeriodParam = m_processorRef.m_parameters.getParameter("vad_grace_period");
     auto vadRetroactiveGracePeriodParam = m_processorRef.m_parameters.getParameter("vad_retroactive_grace_period");
@@ -36,6 +41,11 @@ RnNoiseAudioProcessorEditor::RnNoiseAudioProcessorEditor(RnNoiseAudioProcessor &
                                                                                vadRetroactiveGracePeriodParam->getParameterID(),
                                                                                m_vadRetroactiveGracePeriodSlider);
 
+    addAndMakeVisible(m_statsHeaderLabel);
+    m_statsHeaderLabel.setText("Debug Statistics (updated once per second)", juce::dontSendNotification);
+    m_statsHeaderLabel.setFont(juce::Font(20.0f, juce::Font::bold));
+    m_statsHeaderLabel.setJustificationType(juce::Justification::centred);
+
     addAndMakeVisible(m_statsVadGraceBlocksLabel);
     addAndMakeVisible(m_statsRetroactiveVadGraceBlocksLabel);
     addAndMakeVisible(m_statsBlocksWaitingForOutputLabel);
@@ -57,6 +67,8 @@ void RnNoiseAudioProcessorEditor::resized() {
 
     float width = static_cast<float>(getLocalBounds().getWidth());
 
+    flexBox.items.add(juce::FlexItem(m_headerLabel).withWidth(width).withFlex(1.0));
+
     flexBox.items.add(juce::FlexItem(m_vadThresholdLabel).withWidth(width).withFlex(1.0));
     flexBox.items.add(juce::FlexItem(m_vadThresholdSlider).withWidth(width).withFlex(1.0));
     flexBox.items.add(juce::FlexItem(m_vadGracePeriodLabel).withWidth(width).withFlex(1.0));
@@ -66,6 +78,8 @@ void RnNoiseAudioProcessorEditor::resized() {
     flexBox.items.add(
             juce::FlexItem(m_vadRetroactiveGracePeriodSlider).withWidth(width).withFlex(1.0));
 
+    flexBox.items.add(
+            juce::FlexItem(m_statsHeaderLabel).withWidth(width).withFlex(1.0));
     flexBox.items.add(
             juce::FlexItem(m_statsVadGraceBlocksLabel).withWidth(width).withFlex(1.0));
     flexBox.items.add(
@@ -96,20 +110,20 @@ void RnNoiseAudioProcessorEditor::timerCallback() {
     RnNoiseStats stats = plugin->getStats();
     m_processorRef.m_rnNoisePlugin->resetStats();
 
-    juce::String statsVadGraceBlocksStr = juce::String("Blocks unmuted via VAD: ");
-    statsVadGraceBlocksStr << (int) stats.vadGraceBlocks;
+    juce::String statsVadGraceBlocksStr = juce::String("Unmuted via VAD: ");
+    statsVadGraceBlocksStr << (int) stats.vadGraceBlocks * 10 << " ms";
     m_statsVadGraceBlocksLabel.setText(statsVadGraceBlocksStr, juce::dontSendNotification);
 
-    juce::String statsRetroactiveVadGraceBlocksStr = juce::String("Blocks unmuted via Retroactive VAD: ");
-    statsRetroactiveVadGraceBlocksStr << (int) stats.retroactiveVADGraceBlocks;
+    juce::String statsRetroactiveVadGraceBlocksStr = juce::String("Unmuted via Retroactive VAD: ");
+    statsRetroactiveVadGraceBlocksStr << (int) stats.retroactiveVADGraceBlocks * 10 << " ms";
     m_statsRetroactiveVadGraceBlocksLabel.setText(statsRetroactiveVadGraceBlocksStr, juce::dontSendNotification);
 
-    juce::String statsBlocksWaitingForOutputStr = juce::String("Blocks in output queue: ");
-    statsBlocksWaitingForOutputStr << (int) stats.blocksWaitingForOutput;
+    juce::String statsBlocksWaitingForOutputStr = juce::String("Output queue: ");
+    statsBlocksWaitingForOutputStr << (int) stats.blocksWaitingForOutput * 10 << " ms";
     m_statsBlocksWaitingForOutputLabel.setText(statsBlocksWaitingForOutputStr, juce::dontSendNotification);
 
-    juce::String statsOutputFramesForcedToBeZeroedStr = juce::String("Output blocks stompted: ");
-    statsOutputFramesForcedToBeZeroedStr << (long long int) stats.outputFramesForcedToBeZeroed;
+    juce::String statsOutputFramesForcedToBeZeroedStr = juce::String("Output stomped: ");
+    statsOutputFramesForcedToBeZeroedStr << (long long int) stats.outputFramesForcedToBeZeroed * 10 << " ms";
     m_statsOutputFramesForcedToBeZeroedLabel.setText(statsOutputFramesForcedToBeZeroedStr, juce::dontSendNotification);
 }
 
