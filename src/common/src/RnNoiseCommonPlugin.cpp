@@ -1,7 +1,6 @@
 #include "common/RnNoiseCommonPlugin.h"
 
 #include <cstring>
-#include <ios>
 #include <limits>
 #include <algorithm>
 #include <cassert>
@@ -33,6 +32,15 @@ RnNoiseCommonPlugin::process(const float *const *in, float **out, size_t sampleF
     if (sampleFrames == 0) {
         return;
     }
+
+    if (m_prevRetroactiveVADGraceBlocks > retroactiveVADGraceBlocks) {
+        /* TODO: do not be lazy and adjust output queue directly.
+         * For now, just re-init the plugin to prevent excess latency.
+         */
+        init();
+    }
+
+    m_prevRetroactiveVADGraceBlocks = retroactiveVADGraceBlocks;
 
     RnNoiseStats stats = m_stats.load();
 
@@ -241,6 +249,11 @@ RnNoiseCommonPlugin::process(const float *const *in, float **out, size_t sampleF
 }
 
 void RnNoiseCommonPlugin::createDenoiseState() {
+    m_newOutputIdx = 0;
+    m_lastOutputIdxOverVADThreshold = 0;
+    m_currentOutputIdxToOutput = 0;
+    m_prevRetroactiveVADGraceBlocks = 0;
+
     for (uint32_t i = 0; i < m_channelCount; i++) {
         auto denoiseState = std::shared_ptr<DenoiseState>(rnnoise_create(), [](DenoiseState *st) {
             rnnoise_destroy(st);

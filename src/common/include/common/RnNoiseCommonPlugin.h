@@ -64,6 +64,8 @@ private:
 
     uint64_t m_currentOutputIdxToOutput = 0;
 
+    uint32_t m_prevRetroactiveVADGraceBlocks = 0;
+
     enum class ChunkUnmuteState {
         MUTED,
         UNMUTED_BY_DEFAULT,
