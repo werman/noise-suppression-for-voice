@@ -18,27 +18,25 @@ namespace port_info_custom {
             }
     };
     constexpr static port_info_t vad_grace_period_blocks_input = {
-            "VAD Grace Period (blocks)",
-            "For how many blocks output will not be silenced after a voice was detected last time.",
+            "VAD Grace Period (ms)",
+            "For how long after the last voice detection the output won't be silenced. This helps when ends of words/sentences are being cut off.",
             port_types::input | port_types::control,
             {
                     port_hints::bounded_below | port_hints::bounded_above | port_hints::integer |
                     port_hints::default_low,
                     0.f,
-                    50.f
+                    1000.f
             }
     };
     constexpr static port_info_t retroactive_vad_grace_blocks_input = {
-            "Retroactive VAD Grace (blocks)",
-            "If voice is detected in a sound block, "
-            "a number of past blocks are also considered to be with voice. "
-            "Causes increase of latency by that number of blocks.",
+            "Retroactive VAD Grace (ms)",
+            "Similar to 'VAD Grace Period' but for starts of words/sentences. Warning, this introduces latency!",
             port_types::input | port_types::control,
             {
                     port_hints::bounded_below | port_hints::bounded_above | port_hints::integer |
                     port_hints::default_low,
                     0.f,
-                    50.f
+                    200.f
             }
     };
     constexpr static port_info_t placeholder_input = {
@@ -96,16 +94,18 @@ struct RnNoiseMono {
     }
 
     void run(port_array_t<port_names, port_info> &ports) const {
+        static const uint32_t ms_in_block = 10;
+
         const_buffer in_buffer = ports.get<port_names::in_1>();
         buffer out_buffer = ports.get<port_names::out_1>();
         uint32_t vad_threshold = ports.get<port_names::in_vad_threshold>();
-        uint32_t vad_grace_period_blocks = ports.get<port_names::in_vad_grace_period_blocks>();
-        uint32_t retroactive_vad_grace_blocks = ports.get<port_names::in_retroactive_vad_grace_blocks>();
+        uint32_t vad_grace_period_blocks = ports.get<port_names::in_vad_grace_period_blocks>() / ms_in_block;
+        uint32_t retroactive_vad_grace_blocks = ports.get<port_names::in_retroactive_vad_grace_blocks>() / ms_in_block;
 
         float vad_threshold_normalized = std::max(std::min(vad_threshold / 100.f, 0.99f), 0.f);
 
-        const float *input[] = {in_buffer.data() };
-        float *output[] = {out_buffer.data() };
+        const float *input[] = {in_buffer.data()};
+        float *output[] = {out_buffer.data()};
 
         m_rnNoisePlugin->process(input, output, in_buffer.size(), vad_threshold_normalized,
                                  vad_grace_period_blocks, retroactive_vad_grace_blocks);
@@ -122,7 +122,7 @@ struct RnNoiseStereo {
         out_r,
         in_vad_threshold,
         in_vad_grace_period_blocks,
-        in_retroactively_activated_blocks,
+        in_retroactive_vad_grace_blocks,
         in_placeholder1,
         in_placeholder2,
         size
@@ -165,6 +165,8 @@ struct RnNoiseStereo {
     }
 
     void run(port_array_t<port_names, port_info> &ports) const {
+        static const uint32_t ms_in_block = 10;
+
         const_buffer in_buffer_l = ports.get<port_names::in_1>();
         const_buffer in_buffer_r = ports.get<port_names::in_r>();
 
@@ -172,8 +174,8 @@ struct RnNoiseStereo {
         buffer out_buffer_r = ports.get<port_names::out_r>();
 
         uint32_t vad_threshold = ports.get<port_names::in_vad_threshold>();
-        uint32_t vad_grace_period_blocks = ports.get<port_names::in_vad_grace_period_blocks>();
-        uint32_t retroactive_vad_grace_blocks = ports.get<port_names::in_retroactively_activated_blocks>();
+        uint32_t vad_grace_period_blocks = ports.get<port_names::in_vad_grace_period_blocks>() / ms_in_block;
+        uint32_t retroactive_vad_grace_blocks = ports.get<port_names::in_retroactive_vad_grace_blocks>() / ms_in_block;
 
         float vad_threshold_normalized = std::max(std::min(vad_threshold / 100.f, 0.99f), 0.f);
 
