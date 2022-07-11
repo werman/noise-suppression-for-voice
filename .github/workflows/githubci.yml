@@ -31,18 +31,21 @@ jobs:
             name: "Windows Latest MSVC",
             os: windows-latest,
             cc: "cl", cxx: "cl",
+            build_params: "--config Release",
             artifact_prefix: "win"
           }
           - {
             name: "Ubuntu Latest GCC",
             os: ubuntu-latest,
             cc: "gcc", cxx: "g++",
+            build_params: "",
             artifact_prefix: "linux"
           }
           - {
             name: "macOS Latest Clang",
             os: macos-latest,
             cc: "clang", cxx: "clang++",
+            build_params: "",
             artifact_prefix: "macos",
           }
 
@@ -80,7 +83,7 @@ jobs:
 
       - name: Build
         run: |
-          cmake --build ${{runner.workspace}}/build --parallel
+          cmake --build ${{runner.workspace}}/build ${{matrix.config.build_params}} --parallel
 
       - name: Run tests
         env:
