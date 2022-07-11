@@ -6,6 +6,8 @@ on:
       - master
       - develop
       - ci-test
+    tags:
+      - '*'
   pull_request:
     branches:
       - master
@@ -13,9 +15,9 @@ on:
   workflow_dispatch:
 
 # Building all the plugins doesn't add information but adds time,
-# so build them only for manually launched build.
+# so build them only for manually launched build or release.
 env:
-  full_build: ${{ (github.event_name == 'workflow_dispatch') && 1 || 0 }}
+  full_build: ${{ (github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')) && 1 || 0 }}
 
 jobs:
   build:
