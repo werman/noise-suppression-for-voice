@@ -148,6 +148,8 @@ void RnNoiseAudioProcessor::setStateInformation(const void *data, int sizeInByte
 
     if (!xml || !xml->hasTagName(m_parameters.state.getType()))
         return;
+
+    m_parameters.replaceState(juce::ValueTree::fromXml(*xml));
 }
 
 //==============================================================================
