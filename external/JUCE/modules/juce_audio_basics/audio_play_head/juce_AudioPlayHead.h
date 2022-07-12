@@ -323,7 +323,7 @@ public:
         /** @see getTimeInSamples() */
         void setTimeInSamples (Optional<int64_t> timeInSamplesIn)       {        setOptional (flagTimeSamples, timeInSamples, timeInSamplesIn); }
 
-        /** Returns the number of samples that have elapsed. */
+        /** Returns the number of seconds that have elapsed. */
         Optional<double> getTimeInSeconds() const                       { return getOptional (flagTimeSeconds, timeInSeconds); }
 
         /** @see getTimeInSamples() */
@@ -551,6 +551,10 @@ public:
 
             if (const auto timeInSamples = pos->getTimeInSamples())
                 result.timeInSamples = *timeInSamples;
+
+            result.isPlaying    = pos->getIsPlaying();
+            result.isRecording  = pos->getIsRecording();
+            result.isLooping    = pos->getIsLooping();
 
             return true;
         }

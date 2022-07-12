@@ -30,13 +30,37 @@ namespace juce
 {
 
 //==============================================================================
+template <typename ViewType>
 class CoreGraphicsMetalLayerRenderer
 {
 public:
     //==============================================================================
-    CoreGraphicsMetalLayerRenderer (CAMetalLayer* layer, const Component& comp)
+    CoreGraphicsMetalLayerRenderer (ViewType* view, const Component& comp)
     {
         device.reset (MTLCreateSystemDefaultDevice());
+        commandQueue.reset ([device.get() newCommandQueue]);
+
+        attach (view, comp);
+    }
+
+    ~CoreGraphicsMetalLayerRenderer()
+    {
+        if (memoryBlitCommandBuffer != nullptr)
+        {
+            stopGpuCommandSubmission = true;
+            [memoryBlitCommandBuffer.get() waitUntilCompleted];
+        }
+    }
+
+    void attach (ViewType* view, const Component& comp)
+    {
+       #if JUCE_MAC
+        view.wantsLayer = YES;
+        view.layerContentsPlacement = NSViewLayerContentsPlacementTopLeft;
+        view.layer = [CAMetalLayer layer];
+       #endif
+
+        auto layer = (CAMetalLayer*) view.layer;
 
         layer.device = device.get();
         layer.framebufferOnly = NO;
@@ -44,33 +68,50 @@ public:
         layer.opaque = comp.isOpaque();
         layer.allowsNextDrawableTimeout = NO;
 
-        commandQueue.reset ([device.get() newCommandQueue]);
-
-        memoryBlitEvent.reset ([device.get() newSharedEvent]);
+        attachedView = view;
+        doSynchronousRender = true;
     }
 
-    ~CoreGraphicsMetalLayerRenderer()
+    void detach()
     {
-        stopGpuCommandSubmission = true;
-        [memoryBlitCommandBuffer.get() waitUntilCompleted];
+       #if JUCE_MAC
+        attachedView.wantsLayer = NO;
+        attachedView.layer = nil;
+       #endif
+
+        attachedView = nullptr;
+    }
+
+    bool isAttachedToView (ViewType* view) const
+    {
+        return view == attachedView && attachedView != nullptr;
     }
 
     template <typename Callback>
-    bool drawRectangleList (CAMetalLayer* layer,
+    bool drawRectangleList (ViewType* view,
                             float scaleFactor,
                             CGRect viewFrame,
                             const Component& comp,
                             Callback&& drawRectWithContext,
                             const RectangleList<float>& dirtyRegions)
     {
-        if (resources != nullptr)
-        {
-            // If we haven't finished blitting the CPU texture to the GPU then
-            // report that we have been unable to draw anything.
-            if (memoryBlitEvent.get().signaledValue != memoryBlitCounter + 1)
-                return false;
+        auto layer = (CAMetalLayer*) view.layer;
 
-            ++memoryBlitCounter;
+        if (memoryBlitCommandBuffer != nullptr)
+        {
+            switch ([memoryBlitCommandBuffer.get() status])
+            {
+                case MTLCommandBufferStatusNotEnqueued:
+                case MTLCommandBufferStatusEnqueued:
+                case MTLCommandBufferStatusCommitted:
+                case MTLCommandBufferStatusScheduled:
+                    // If we haven't finished blitting the CPU texture to the GPU then
+                    // report that we have been unable to draw anything.
+                    return false;
+                case MTLCommandBufferStatusCompleted:
+                case MTLCommandBufferStatusError:
+                    break;
+            }
         }
 
         layer.contentsScale = scaleFactor;
@@ -80,7 +121,7 @@ public:
 
         const auto componentHeight = comp.getHeight();
 
-        if (! CGSizeEqualToSize (layer.drawableSize, transformedFrameSize))
+        if (resources == nullptr || ! CGSizeEqualToSize (layer.drawableSize, transformedFrameSize))
         {
             layer.drawableSize = transformedFrameSize;
             resources = std::make_unique<Resources> (device.get(), layer, componentHeight);
@@ -112,66 +153,75 @@ public:
 
         auto sharedTexture = resources->getSharedTexture();
 
-        memoryBlitCommandBuffer.reset ([commandQueue.get() commandBuffer]);
-
-        // Command buffers are usually considered temporary, and are automatically released by
-        // the operating system when the rendering pipeline is finsihed. However, we want to keep
-        // this one alive so that we can wait for pipeline completion in the destructor.
-        [memoryBlitCommandBuffer.get() retain];
-
-        auto blitCommandEncoder = [memoryBlitCommandBuffer.get() blitCommandEncoder];
-        [blitCommandEncoder copyFromTexture: sharedTexture
-                                sourceSlice: 0
-                                sourceLevel: 0
-                               sourceOrigin: MTLOrigin{}
-                                 sourceSize: MTLSize { sharedTexture.width, sharedTexture.height, 1 }
-                                  toTexture: gpuTexture
-                           destinationSlice: 0
-                           destinationLevel: 0
-                          destinationOrigin: MTLOrigin{}];
-        [blitCommandEncoder endEncoding];
-
-        // Signal that the GPU has finished using the CPU texture
-        [memoryBlitCommandBuffer.get() encodeSignalEvent: memoryBlitEvent.get()
-                                                   value: memoryBlitCounter + 1];
-
-        [memoryBlitCommandBuffer.get() addScheduledHandler: ^(id<MTLCommandBuffer>)
+        auto encodeBlit = [] (id<MTLCommandBuffer> commandBuffer,
+                              id<MTLTexture> source,
+                              id<MTLTexture> destination)
         {
-            // We're on a Metal thread, so we can make a blocking nextDrawable call
-            // without stalling the message thread.
+            auto blitCommandEncoder = [commandBuffer blitCommandEncoder];
+            [blitCommandEncoder copyFromTexture: source
+                                    sourceSlice: 0
+                                    sourceLevel: 0
+                                   sourceOrigin: MTLOrigin{}
+                                     sourceSize: MTLSize { source.width, source.height, 1 }
+                                      toTexture: destination
+                               destinationSlice: 0
+                               destinationLevel: 0
+                              destinationOrigin: MTLOrigin{}];
+            [blitCommandEncoder endEncoding];
+        };
 
-            // Check if we can do an early exit.
-            if (stopGpuCommandSubmission)
-                return;
-
+        if (doSynchronousRender)
+        {
             @autoreleasepool
             {
+                id<MTLCommandBuffer> commandBuffer = [commandQueue.get() commandBuffer];
+
                 id<CAMetalDrawable> drawable = [layer nextDrawable];
+                encodeBlit (commandBuffer, sharedTexture, drawable.texture);
 
-                id<MTLCommandBuffer> presentationCommandBuffer = [commandQueue.get() commandBuffer];
-
-                auto presentationBlitCommandEncoder = [presentationCommandBuffer blitCommandEncoder];
-                [presentationBlitCommandEncoder copyFromTexture: gpuTexture
-                                                    sourceSlice: 0
-                                                    sourceLevel: 0
-                                                   sourceOrigin: MTLOrigin{}
-                                                     sourceSize: MTLSize { gpuTexture.width, gpuTexture.height, 1 }
-                                                      toTexture: drawable.texture
-                                               destinationSlice: 0
-                                               destinationLevel: 0
-                                              destinationOrigin: MTLOrigin{}];
-                [presentationBlitCommandEncoder endEncoding];
-
-                [presentationCommandBuffer addScheduledHandler: ^(id<MTLCommandBuffer>)
-                {
-                    [drawable present];
-                }];
-
-                [presentationCommandBuffer commit];
+                [commandBuffer presentDrawable: drawable];
+                [commandBuffer commit];
             }
-        }];
 
-        [memoryBlitCommandBuffer.get() commit];
+            doSynchronousRender = false;
+        }
+        else
+        {
+            // Command buffers are usually considered temporary, and are automatically released by
+            // the operating system when the rendering pipeline is finsihed. However, we want to keep
+            // this one alive so that we can wait for pipeline completion in the destructor.
+            memoryBlitCommandBuffer.reset ([[commandQueue.get() commandBuffer] retain]);
+
+            encodeBlit (memoryBlitCommandBuffer.get(), sharedTexture, gpuTexture);
+
+            [memoryBlitCommandBuffer.get() addScheduledHandler: ^(id<MTLCommandBuffer>)
+            {
+                // We're on a Metal thread, so we can make a blocking nextDrawable call
+                // without stalling the message thread.
+
+                // Check if we can do an early exit.
+                if (stopGpuCommandSubmission)
+                    return;
+
+                @autoreleasepool
+                {
+                    id<CAMetalDrawable> drawable = [layer nextDrawable];
+
+                    id<MTLCommandBuffer> presentationCommandBuffer = [commandQueue.get() commandBuffer];
+
+                    encodeBlit (presentationCommandBuffer, gpuTexture, drawable.texture);
+
+                    [presentationCommandBuffer addScheduledHandler: ^(id<MTLCommandBuffer>)
+                    {
+                        [drawable present];
+                    }];
+
+                    [presentationCommandBuffer commit];
+                }
+            }];
+
+            [memoryBlitCommandBuffer.get() commit];
+        }
 
         return true;
     }
@@ -182,18 +232,6 @@ private:
     {
         return ((n + alignment - 1) / alignment) * alignment;
     }
-
-    //==============================================================================
-    struct TextureDeleter
-    {
-        void operator() (id<MTLTexture> texture) const noexcept
-        {
-            [texture setPurgeableState: MTLPurgeableStateEmpty];
-            [texture release];
-        }
-    };
-
-    using TextureUniquePtr = std::unique_ptr<std::remove_pointer_t<id<MTLTexture>>, TextureDeleter>;
 
     //==============================================================================
     class GpuTexturePool
@@ -208,12 +246,12 @@ private:
         id<MTLTexture> take() const
         {
             auto iter = std::find_if (textureCache.begin(), textureCache.end(),
-                                      [] (const TextureUniquePtr& t) { return [t.get() retainCount] == 1; });
+                                      [] (const ObjCObjectHandle<id<MTLTexture>>& t) { return [t.get() retainCount] == 1; });
             return iter == textureCache.end() ? nullptr : (*iter).get();
         }
 
     private:
-        std::array<TextureUniquePtr, 3> textureCache;
+        std::array<ObjCObjectHandle<id<MTLTexture>>, 3> textureCache;
 
         JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (GpuTexturePool)
         JUCE_DECLARE_NON_MOVEABLE (GpuTexturePool)
@@ -338,7 +376,7 @@ private:
         detail::ContextPtr cgContext;
 
         ObjCObjectHandle<id<MTLBuffer>> buffer;
-        TextureUniquePtr sharedTexture;
+        ObjCObjectHandle<id<MTLTexture>> sharedTexture;
         std::unique_ptr<GpuTexturePool> gpuTexturePool;
 
         JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (Resources)
@@ -346,14 +384,15 @@ private:
     };
 
     //==============================================================================
+    ViewType* attachedView = nullptr;
+    bool doSynchronousRender = false;
+
     std::unique_ptr<Resources> resources;
 
     ObjCObjectHandle<id<MTLDevice>> device;
     ObjCObjectHandle<id<MTLCommandQueue>> commandQueue;
     ObjCObjectHandle<id<MTLCommandBuffer>> memoryBlitCommandBuffer;
-    ObjCObjectHandle<id<MTLSharedEvent>> memoryBlitEvent;
 
-    uint64_t memoryBlitCounter = 0;
     std::atomic<bool> stopGpuCommandSubmission { false };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (CoreGraphicsMetalLayerRenderer)

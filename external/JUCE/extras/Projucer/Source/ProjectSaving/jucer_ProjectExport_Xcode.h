@@ -2101,7 +2101,7 @@ private:
             if (target->type == XcodeTarget::LV2TurtleProgram
                 && project.getEnabledModules().isModuleEnabled ("juce_audio_plugin_client"))
             {
-                const auto path = getLV2TurtleDumpProgramSource();
+                const auto path = rebaseFromProjectFolderToBuildTarget (getLV2TurtleDumpProgramSource());
                 addFile (FileOptions().withRelativePath ({ expandPath (path.toUnixStyle()), path.getRoot() })
                                       .withSkipPCHEnabled (true)
                                       .withCompilationEnabled (true)
@@ -2297,10 +2297,12 @@ private:
 
                     if (installPath.isNotEmpty())
                     {
-                        script << "if [ \"$CONFIGURATION\" = \"" << config->getName()
-                               << "\" ]; then\n   /bin/ln -sfh \"$CONFIGURATION_BUILD_DIR\" \""
-                               << installPath.replace ("$(HOME)", "$HOME") << '/' << target->getLV2BundleName()
-                               << "\"\nfi\n";
+                        const auto destination = installPath.replace ("$(HOME)", "$HOME");
+
+                        script << "if [ \"$CONFIGURATION\" = \"" << config->getName() << "\" ]; then\n"
+                                  "mkdir -p \"" << destination << "\"\n"
+                                  "/bin/ln -sfh \"$CONFIGURATION_BUILD_DIR\" \"" << destination << "\"\n"
+                                  "fi\n";
                     }
                 }
 
