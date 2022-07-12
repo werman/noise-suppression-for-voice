@@ -1,21 +1,11 @@
-name: Test Build
+name: Create Release
 
 on:
-  push:
-    branches:
-      - master
-      - develop
-      - ci-test
-  pull_request:
-    branches:
-      - master
-
   workflow_dispatch:
-
-# Building all the plugins doesn't add information but adds time,
-# so build them only for manually launched builds.
-env:
-  full_build: ${{ (github.event_name == 'workflow_dispatch') && 1 || 0 }}
+    inputs:
+      tag:
+        description: 'Tag for the release (e.g. 1.01 or 2.25)'
+        required: true
 
 jobs:
   build:
@@ -56,28 +46,19 @@ jobs:
           sudo apt-get install --no-install-recommends \
               libx11-dev libxcomposite-dev libxcursor-dev libxext-dev libxinerama-dev libxrandr-dev libxrender-dev
 
-      - name: ccache
-        # TODO: Make MSVC build work with ccache
-        if: ${{ matrix.config.os != 'windows-latest' }}
-        uses: hendrikmuhs/ccache-action@v1.2.2
-        with:
-          key: ${{ matrix.config.os }}
-          variant: ccache
-          max-size: 100M
-
       - name: Configure
         env:
           CC: ${{ matrix.config.cc }}
           CXX: ${{ matrix.config.cxx }}
           CMAKE_OSX_ARCHITECTURES: "x86_64;arm64"
         run: >-
-          cmake -B${{runner.workspace}}/build -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+          cmake -B${{runner.workspace}}/build -DCMAKE_BUILD_TYPE=Release
           -DBUILD_LADSPA_PLUGIN=1
           -DBUILD_VST_PLUGIN=1
-          -DBUILD_VST3_PLUGIN=${{env.full_build}}
-          -DBUILD_LV2_PLUGIN=${{env.full_build}}
-          -DBUILD_AU_PLUGIN=${{env.full_build}}
-          -DBUILD_AUV3_PLUGIN=${{env.full_build}}
+          -DBUILD_VST3_PLUGIN=1
+          -DBUILD_LV2_PLUGIN=1
+          -DBUILD_AU_PLUGIN=1
+          -DBUILD_AUV3_PLUGIN=1
 
       - name: Build
         run: |
@@ -100,3 +81,35 @@ jobs:
             !**/*.pdb
           retention-days: 5
           if-no-files-found: error
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v3
+
+      # download-artifact@v3 unpacks artifacts
+      # See https://github.com/actions/download-artifact/issues/143
+      - name: Zip
+        run: |
+          zip -r linux-rnnoise linux-rnnoise
+          zip -r win-rnnoise win-rnnoise
+          zip -r macos-rnnoise-linux macos-rnnoise
+
+      - name: Create tag
+        id: tag_version
+        uses: mathieudutour/github-tag-action@v6.0
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          custom_tag: ${{ inputs.tag }}
+
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        with:
+          draft: true
+          tag_name: v${{ inputs.tag }}
+          files: |
+            linux-rnnoise.zip
+            macos-rnnoise.zip
+            win-rnnoise.zip
