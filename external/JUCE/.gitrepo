@@ -7,6 +7,6 @@
 	remote = https://github.com/juce-framework/JUCE.git
 	branch = juce7
 	commit = 784f82ffec6b67d853025ea3ea64c793e84e622b
-	parent = ab780c4f2e44d4cd839120a999d83d90361d800a
+	parent = 763afdbc56871e0eb8a23129f3d5341a7ee869ee
 	method = merge
 	cmdver = 0.4.3
