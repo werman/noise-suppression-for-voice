@@ -33,7 +33,7 @@ function(compile_plugins formats suffix default_channels)
     set(PLUGIN_NAME "${PROJECT_NAME}${suffix}")
 
     juce_add_plugin(${PLUGIN_NAME}
-            VERSION 1.00
+            VERSION ${BUILD_VERSION}
             PLUGIN_NAME "RNNoise suppression for voice"
             COMPANY_NAME werman
             BUNDLE_ID my.werman.noise_suppression_for_voice

@@ -9,6 +9,10 @@ set(CMAKE_BINARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
 set(MINGW_ADDITIONAL_LINKING_FLAGS "-static-libgcc -static-libstdc++ -Wl,-Bstatic -lstdc++ -lpthread -Wl,-Bdynamic")
 
+if(NOT BUILD_VERSION)
+    set(BUILD_VERSION 1.99)
+endif()
+
 option(BUILD_TESTS "" ON)
 option(BUILD_VST_PLUGIN "If the VST2 plugin should be built" ON)
 option(BUILD_VST3_PLUGIN "If the VST3 plugin should be built" ON)
