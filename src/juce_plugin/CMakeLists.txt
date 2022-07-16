@@ -80,6 +80,21 @@ function(compile_plugins formats suffix default_channels)
     if (MINGW)
         target_link_libraries(${PLUGIN_NAME} ${MINGW_ADDITIONAL_LINKING_FLAGS})
     endif ()
+
+    # JUCE has a terrible idea of installing plugin during the BUILD process instead of during the INSTALL,
+    # also JUCE wants to install its headers which we don't want at all.
+    # So it's easier to handle it ourselves.
+    if (UNIX AND NOT APPLE)
+        foreach (format IN LISTS formats)
+            if (format STREQUAL "LV2")
+                install(DIRECTORY ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/rnnoise${suffix}.lv2 DESTINATION ${CMAKE_INSTALL_LIBDIR}/lv2)
+            elseif (format STREQUAL "VST")
+                install(DIRECTORY ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/vst/ DESTINATION ${CMAKE_INSTALL_LIBDIR}/lxvst)
+            elseif (format STREQUAL "VST3")
+                install(DIRECTORY ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/rnnoise.vst3 DESTINATION ${CMAKE_INSTALL_LIBDIR}/vst3)
+            endif ()
+        endforeach ()
+    endif ()
 endfunction()
 
 set(FORMATS "")
