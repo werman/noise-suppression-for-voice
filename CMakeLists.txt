@@ -13,6 +13,7 @@ if(NOT BUILD_VERSION)
     set(BUILD_VERSION 1.99)
 endif()
 
+option(BUILD_FOR_RELEASE "Additional optimizations and steps may be taken for release" OFF)
 option(BUILD_TESTS "" ON)
 option(BUILD_VST_PLUGIN "If the VST2 plugin should be built" ON)
 option(BUILD_VST3_PLUGIN "If the VST3 plugin should be built" ON)

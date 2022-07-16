@@ -52,7 +52,10 @@ jobs:
           CXX: ${{ matrix.config.cxx }}
           CMAKE_OSX_ARCHITECTURES: "x86_64;arm64"
         run: >-
-          cmake -B${{runner.workspace}}/build -DCMAKE_BUILD_TYPE=Release -DBUILD_VERSION=${{ inputs.tag }}
+          cmake -B${{runner.workspace}}/build
+          -DCMAKE_BUILD_TYPE=Release
+          -DBUILD_FOR_RELEASE=1
+          -DBUILD_VERSION=${{ inputs.tag }}
           -DBUILD_LADSPA_PLUGIN=1
           -DBUILD_VST_PLUGIN=1
           -DBUILD_VST3_PLUGIN=1

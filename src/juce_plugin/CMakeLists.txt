@@ -70,9 +70,12 @@ function(compile_plugins formats suffix default_channels)
             RnNoisePluginCommon
             PUBLIC
             juce::juce_recommended_config_flags
-# TODO: Enable LTO only for releases.
-#            juce::juce_recommended_lto_flags
             juce::juce_recommended_warning_flags)
+
+    if (BUILD_FOR_RELEASE)
+        # lto considerably reduces library size
+        target_link_libraries(${PLUGIN_NAME} PRIVATE juce::juce_recommended_lto_flags)
+    endif ()
 
     set(COMPILE_OPTIONS "$<$<CONFIG:RELEASE>:-O3;>")
     target_compile_options(${PLUGIN_NAME} PRIVATE ${COMPILE_OPTIONS})
