@@ -19,6 +19,8 @@ The plugin is meant to suppress a wide range of noise origins ([from original pa
 
 From my tests mild background noise is always suppressed, loud sounds, like clicking of mechanical keyboard, are suppressed while there is no voice however they are only reduced in volume when voice is present. 
 
+Please note that this plugin could not improve the voice quality with bad microphone, it even could make things worse by misclassifying the voice as a noise which would reduce already not-so-good voice quality.  
+
 The plugin works with one or more channels, 16 bit, 48000 Hz audio input.
 
 :exclamation: :exclamation: :exclamation: Do NOT use any other sample rates, use ONLY 48000 Hz, make sure your audio source is 48000 Hz and force it to be 48000 Hz if it is not.
@@ -38,7 +40,7 @@ There is a minimalistic GUI with all parameters and diagnostic stats:
 ### Plugin Settings
 
 - `VAD Threshold (%)` - if probability of sound being a voice is lower than this threshold - it will be silenced.
-  By default, VAD threshold is 50% which should work with any mic. For most mics higher threshold `control=95` would be fine.
+  In most cases the threshold between 85% - 95% would be fine.
   Without the VAD some loud noises may still be a bit audible when there is no voice.
 - `VAD Grace Period (ms)` - for how long after the last voice detection the output won't be silenced. This helps when ends of words/sentences are being cut off.
 - `Retroactive VAD Grace Period (ms)` - similar to `VAD Grace Period (ms)` but for starts of words/sentences. :warning: This introduces latency!
