@@ -40,6 +40,16 @@ RnNoiseCommonPlugin::process(const float *const *in, float **out, size_t sampleF
         init();
     }
 
+    /* For offline processing hosts could pass a lot of frames at once, there is also no
+     * indicator whether additional frames are expected. By default, we accumulate enough
+     * output frame to write sampleFrames number of frames into output, however with large
+     * input we have to output what we have and zero out the rest. Otherwise, we'd have too
+     * much output buffered and never written.
+     * Fixes compatibility with Audacity. 500 ms cut-off is arbitrary.
+     * TODO: Is there a better way to handle offline processing with big inputs?
+     */
+    bool waitForEnoughFrames = sampleFrames < (k_denoiseBlockSize * 50);
+
     m_prevRetroactiveVADGraceBlocks = retroactiveVADGraceBlocks;
 
     RnNoiseStats stats = m_stats.load();
@@ -182,7 +192,7 @@ RnNoiseCommonPlugin::process(const float *const *in, float **out, size_t sampleF
     /* Wait until there are enough frames to fill all the output. Yes, it creates latency but
      * That's why it is STRONGLY recommended for sampleFrames to be divisible by k_denoiseBlockSize.
      */
-    if (!hasEnoughFrames) {
+    if (waitForEnoughFrames && !hasEnoughFrames) {
         for (uint32_t channelIdx = 0; channelIdx < m_channelCount; channelIdx++) {
             std::fill(out[channelIdx], out[channelIdx] + sampleFrames, 0.f);
         }
@@ -220,6 +230,10 @@ RnNoiseCommonPlugin::process(const float *const *in, float **out, size_t sampleF
         }
 
         blockIdxRelative = std::max(blockIdxRelative, 0);
+
+        if (channel.idx == 0) {
+            stats.outputFramesForcedToBeZeroed += sampleFrames - curOutFrameIdx;
+        }
 
         for (; curOutFrameIdx < sampleFrames; curOutFrameIdx++) {
             out[channel.idx][curOutFrameIdx] = 0.f;
