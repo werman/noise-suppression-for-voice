@@ -188,6 +188,7 @@ typedef enum {
   FST_EFFECT_OPCODE(EditGetRect, 13), /* OUT:ptr(ERect*), return ptr */
   FST_EFFECT_OPCODE(EditOpen, 14),
   FST_EFFECT_OPCODE(EditClose, 15), /* return 0 */
+  FST_EFFECT_OPCODE(EditIdle, 19),
 
   FST_EFFECT_OPCODE(Identify, 22), /* return ByteOrder::bigEndianInt ("NvEf") 1316373862 or 1715828302 */
   FST_EFFECT_OPCODE(GetChunk, 23), /* IN:index, OUT:ptr(void*), return size */
@@ -230,7 +231,6 @@ typedef enum {
   FST_EFFECT_OPCODE_UNKNOWN(EditMouse),
   FST_EFFECT_OPCODE_UNKNOWN(EditSleep),
   FST_EFFECT_OPCODE_UNKNOWN(EditTop),
-  FST_EFFECT_OPCODE_UNKNOWN(EditIdle),
 
   FST_EFFECT_OPCODE_UNKNOWN(GetNumMidiInputChannels), /* return 16*isMidi */
   FST_EFFECT_OPCODE_UNKNOWN(GetNumMidiOutputChannels), /* return 16*isMidi */
