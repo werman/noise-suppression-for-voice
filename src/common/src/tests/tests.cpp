@@ -59,7 +59,10 @@ TEST_CASE("All options", "[common_plugin]") {
 
         for (int ch = 0; ch < channels; ch++) {
             for (int j = 0; j < sampleFrames; j++) {
-                REQUIRE(outputs[ch][j] != -1.f);
+                if (outputs[ch][j] != -1.f) {
+                    CAPTURE(ch, j);
+                    FAIL("No output written");
+                }
             }
         }
     }
