@@ -99,7 +99,7 @@ jobs:
         run: |
           zip -r linux-rnnoise linux-rnnoise
           zip -r win-rnnoise win-rnnoise
-          zip -r macos-rnnoise-linux macos-rnnoise
+          zip -r macos-rnnoise macos-rnnoise
 
       - name: Create tag
         id: tag_version
