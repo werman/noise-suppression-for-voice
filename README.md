@@ -151,15 +151,15 @@ You can automate this by creating file in `~/.config/pulse/default.pa` with the 
 .include /etc/pulse/default.pa
 
 load-module module-null-sink sink_name=mic_denoised_out rate=48000
-load-module module-ladspa-sink sink_name=mic_raw_in sink_master=mic_denoised_out label=noise_suppressor_mono plugin=/path/to/librnnoise_ladspa.so control=50,20,0,0,0
+load-module module-ladspa-sink sink_name=mic_raw_in sink_master=mic_denoised_out label=noise_suppressor_mono plugin=/path/to/librnnoise_ladspa.so control=50,200,0,0,0
 load-module module-loopback source=your_mic_name sink=mic_raw_in channels=1 source_dont_move=true sink_dont_move=true
 
 set-default-source mic_denoised_out.monitor
 ```
 
-The order of settings in `control=50,20,0,0,0` is: `VAD Threshold (%)`, `VAD Grace Period (ms)`, `Retroactive VAD Grace Period (ms)`, `Placeholder1`, `Placeholder2`.
+The order of settings in `control=50,200,0,0,0` is: `VAD Threshold (%)`, `VAD Grace Period (ms)`, `Retroactive VAD Grace Period (ms)`, `Placeholder1`, `Placeholder2`.
 
-If you have a stereo input use these options instead:
+If you are absolutely sure that you want a stereo input use these options instead:
 
 - `label=noise_suppressor_stereo`
 - `channels=2`
