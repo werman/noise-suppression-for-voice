@@ -55,7 +55,7 @@ RnNoiseAudioProcessorEditor::RnNoiseAudioProcessorEditor(RnNoiseAudioProcessor &
 }
 
 void RnNoiseAudioProcessorEditor::paint(juce::Graphics &g) {
-    Component::paint(g);
+    g.fillAll(juce::Colours::black);
 }
 
 void RnNoiseAudioProcessorEditor::resized() {
