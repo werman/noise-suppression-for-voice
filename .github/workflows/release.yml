@@ -19,13 +19,14 @@ jobs:
             name: "Windows Latest MSVC",
             os: windows-latest,
             cc: "cl", cxx: "cl",
-            build_params: "--config Release",
+            build_params: "--parallel --config Release",
             artifact_prefix: "win"
           }
           - {
             name: "Ubuntu Latest GCC",
             os: ubuntu-latest,
             cc: "gcc", cxx: "g++",
+            # Build is not parallel because gcc seem to run out of memory
             build_params: "",
             artifact_prefix: "linux"
           }
@@ -33,7 +34,7 @@ jobs:
             name: "macOS Latest Clang",
             os: macos-latest,
             cc: "clang", cxx: "clang++",
-            build_params: "",
+            build_params: "--parallel",
             artifact_prefix: "macos",
           }
 
@@ -65,7 +66,7 @@ jobs:
 
       - name: Build
         run: |
-          cmake --build ${{runner.workspace}}/build ${{matrix.config.build_params}} --parallel
+          cmake --build ${{runner.workspace}}/build ${{matrix.config.build_params}}
 
       - name: Run tests
         env:
