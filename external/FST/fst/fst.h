@@ -93,12 +93,10 @@
 
 #define VSTCALLBACK
 
-#if defined(_WIN32) && defined(__x86_64__)
-typedef long long t_fstPtrInt; /* pointer sized int */
-#else
-typedef long t_fstPtrInt; /* pointer sized int */
-#endif
-typedef int t_fstInt32; /* 32bit int */
+#include <stdint.h>
+
+typedef intptr_t t_fstPtrInt; /* pointer sized int */
+typedef int32_t t_fstInt32; /* 32bit int */
 
 typedef enum {
   FST_HOST_OPCODE(Automate, 0), /* IN:index, IN:fvalue, return 0 */
