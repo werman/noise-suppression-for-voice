@@ -219,7 +219,7 @@ cmake -D CMAKE_CXX_FLAGS=-m32 -D CMAKE_C_FLAGS=-m32 -Bbuild-x32 -H. -GNinja -DCM
 ninja -C build-x32
 ```
 
-Cross-compiling for Windows x64:
+Cross-compiling for Windows x64 (MinGW builds are failing at the moment due to certain incompatibilities in JUCE):
 ```sh
 cmake -Bbuild-mingw64 -H. -GNinja -DCMAKE_TOOLCHAIN_FILE=toolchains/toolchain-mingw64.cmake -DCMAKE_BUILD_TYPE=Release
 ninja -C build-mingw64
