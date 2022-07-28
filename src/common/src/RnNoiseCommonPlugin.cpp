@@ -109,8 +109,8 @@ RnNoiseCommonPlugin::process(const float *const *in, float **out, size_t sampleF
      */
     for (uint32_t blockIdx = 0; blockIdx < blocksFromRnnoise; blockIdx++) {
         float maxVadProbability = 0.f;
-        auto getCurOut = [blockIdx](ChannelData &channel) {
-            return channel.rnnoiseOutput.rbegin()[blockIdx].get();
+        auto getCurOut = [blockIdx, blocksFromRnnoise](ChannelData &channel) {
+            return channel.rnnoiseOutput.rbegin()[blocksFromRnnoise - blockIdx - 1].get();
         };
 
         for (auto &channel: m_channels) {
@@ -152,15 +152,13 @@ RnNoiseCommonPlugin::process(const float *const *in, float **out, size_t sampleF
                 auto &outBlock = channel.rnnoiseOutput.rbegin()[blockIdx];
                 if (outBlock->maxVadProbability >= vadThreshold) {
                     lastBlockIdxOverVADThreshold = outBlock->idx;
-                } else {
+                } else if (outBlock->muteState == ChunkUnmuteState::MUTED) {
                     bool inVadPeriod = (lastBlockIdxOverVADThreshold - outBlock->idx) <= retroactiveVADGraceBlocks;
-                    if (inVadPeriod && outBlock->muteState != ChunkUnmuteState::UNMUTED_VAD) {
+                    if (inVadPeriod) {
                         outBlock->muteState = ChunkUnmuteState::UNMUTED_RETRO_VAD;
                         if (channel.idx == 0) {
                             stats.retroactiveVADGraceBlocks++;
                         }
-                    } else {
-                        outBlock->muteState = ChunkUnmuteState::MUTED;
                     }
                 }
             }
