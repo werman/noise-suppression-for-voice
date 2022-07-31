@@ -116,7 +116,7 @@ Troubleshooting:
 - TODO, how to change sample rate for mic.
 
 Alternative solutions for PipeWire/PulseAudio configuration which also use RNNoise:
-- [easyeffects](https://github.com/wwmm/easyeffects) - a general solution for audio effects GUI for PipeWire. Easy to set up and use. Fewer settings for denoising. Available on Flathub.
+- [EasyEffects](https://github.com/wwmm/easyeffects) - a general solution for audio effects GUI for PipeWire. Easy to set up and use. Fewer settings for denoising. Available on Flathub.
 - [NoiseTorch](https://github.com/noisetorch/NoiseTorch) - easy to set up, works with PulseAudio and Pipewire. Fewer settings for denoising.
 
 #### PulseAudio
