@@ -13,6 +13,7 @@ if(NOT BUILD_VERSION)
     set(BUILD_VERSION 1.99)
 endif()
 
+option(USE_SYSTEM_JUCE "" OFF)
 option(BUILD_FOR_RELEASE "Additional optimizations and steps may be taken for release" OFF)
 option(BUILD_TESTS "" ON)
 option(BUILD_VST_PLUGIN "If the VST2 plugin should be built" ON)
@@ -31,10 +32,16 @@ add_subdirectory(src/common)
 if (BUILD_LADSPA_PLUGIN)
     add_subdirectory(src/ladspa_plugin)
 endif ()
+
 if (BUILD_VST_PLUGIN OR BUILD_VST3_PLUGIN OR BUILD_LV2_PLUGIN OR BUILD_AU_PLUGIN OR BUILD_AUV3_PLUGIN)
-    # For install JUCE copies all its headers, no one needs them. It also doesn't install actual libraries.
-    # On the other hand JUCE could install libraries during build process (see COPY_PLUGIN_AFTER_BUILD option).
-    # So we have to manually install plugins.
-    add_subdirectory(external/JUCE EXCLUDE_FROM_ALL)
+    if (USE_SYSTEM_JUCE)
+        find_package(JUCE)
+    else ()
+        # For install JUCE copies all its headers, no one needs them. It also doesn't install actual libraries.
+        # On the other hand JUCE could install libraries during build process (see COPY_PLUGIN_AFTER_BUILD option).
+        # So we have to manually install plugins.
+        add_subdirectory(${JUCE_SOURCE_DIR} external/JUCE EXCLUDE_FROM_ALL)
+    endif ()
+
     add_subdirectory(src/juce_plugin)
 endif ()
