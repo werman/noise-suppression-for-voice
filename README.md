@@ -82,9 +82,9 @@ context.modules = [
                     plugin = /path/to/librnnoise_ladspa.so
                     label = noise_suppressor_mono
                     control = {
-                        "VAD Threshold (%)" 50.0
-                        "VAD Grace Period (ms)" 200
-                        "Retroactive VAD Grace (ms)" 0
+                        "VAD Threshold (%)" = 50.0
+                        "VAD Grace Period (ms)" = 200
+                        "Retroactive VAD Grace (ms)" = 0
                     }
                 }
             ]
