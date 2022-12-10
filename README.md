@@ -47,9 +47,10 @@ There is a minimalistic GUI with all parameters and diagnostic stats:
 
 ### Windows + Equalizer APO (VST2)
 
-To check or change mic settings go to "Recording devices" -> "Recording" -> "Properties" of the target mic -> "Advanced".
+To check or change existing mic settings go to the Control Panel -> Sound ->  "Recording" -> "Properties" of the device. You might want to turn off your existing noise reduction filters first. 
+:exclamation: WHILE YOU'RE THERE, ALSO MAKE SURE THE OUTPUT IS SET TO 16BIT/48KHZ, UNDER THE ADVANCED TAB. IT SHOULD LOOK LIKE [THIS](https://linustechtips.com/uploads/monthly_2021_10/image.png.25611841e44041fb7753dd340e714fff.png).
 
-To enable the plugin in Equalizer APO select "Plugins" -> "VST Plugin" and specify the plugin dll.
+To enable the plugin in Equalizer APO, select "Plugins" -> "VST Plugin" and specify the plugin VST DLL. Equalizer APO is not VST3 compatible, so VST3 will not work.
 
 See [detailed guide](https://medium.com/@bssankaran/free-and-open-source-software-noise-cancelling-for-working-from-home-edb1b4e9764e) provided by  [@bssankaran](https://github.com/bssankaran).
 
