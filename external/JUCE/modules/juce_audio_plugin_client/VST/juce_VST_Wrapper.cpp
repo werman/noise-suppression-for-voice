@@ -1972,7 +1972,7 @@ private:
         auto** pluginInput  = reinterpret_cast<Vst2::VstSpeakerArrangement**> (args.value);
         auto** pluginOutput = reinterpret_cast<Vst2::VstSpeakerArrangement**> (args.ptr);
 
-        if (pluginHasSidechainsOrAuxs() || processor->isMidiEffect())
+        if (pluginHasSidechainsOrAuxs() || processor->isMidiEffect() || !*pluginInput || !*pluginOutput)
             return false;
 
         auto inputLayout  = processor->getChannelLayoutOfBus (true,  0);
