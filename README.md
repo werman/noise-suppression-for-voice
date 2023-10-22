@@ -66,11 +66,14 @@ For older PipeWire version you'd have to copy `/usr/share/pipewire/pipewire.conf
 For PipeWire >= `0.3.45` you should:
 
 - Create config directory: `~/.config/pipewire/pipewire.conf.d/`
+
 - Create config for plugin: `~/.config/pipewire/pipewire.conf.d/99-input-denoising.conf`
+
 - Paste configuration:
-```
-context.modules = [
-{   name = libpipewire-module-filter-chain
+  
+  ```
+  context.modules = [
+  {   name = libpipewire-module-filter-chain
     args = {
         node.description =  "Noise Canceling source"
         media.name =  "Noise Canceling source"
@@ -100,22 +103,28 @@ context.modules = [
             audio.rate = 48000
         }
     }
-}
-]
-```
+  }
+  ]
+  ```
 
 - Change `/path/to/librnnoise_ladspa.so` to actual library path
+
 - If you are **absolutely** sure that you need stereo output - change `noise_suppressor_mono` -> `noise_suppressor_stereo`. Even if your mic says that it is stereo - you probably don't need stereo output. It also would consume 2x resources.
+
 - Configure plugin parameters: `VAD Threshold (%)`, ...
+
 - Restart PipeWire: `systemctl restart --user pipewire.service`
+
 - Now you should be able to select `Noise Canceling source` as input device
 
 For more information consult PipeWire documentation on [Filter-Chains](https://docs.pipewire.org/page_module_filter_chain.html)
 
 Troubleshooting:
+
 - TODO, how to change sample rate for mic.
 
 Alternative solutions for PipeWire/PulseAudio configuration which also use RNNoise:
+
 - [EasyEffects](https://github.com/wwmm/easyeffects) - a general solution for audio effects GUI for PipeWire. Easy to set up and use. Fewer settings for denoising. Available on Flathub.
 - [NoiseTorch](https://github.com/noisetorch/NoiseTorch) - easy to set up, works with PulseAudio and Pipewire. Fewer settings for denoising.
 
@@ -133,11 +142,13 @@ The idea is:
 - Create loopback from microphone (`source`) to input sink of plugin (`sink`) with 1 channel.
 
 For example, to create a new mono device with noise-reduced audio from your microphone, first, find your mic name using e.g.:
+
 ```sh
 pactl list sources short
 ```
 
 Then, create the new device using:
+
 ```sh
 pacmd load-module module-null-sink sink_name=mic_denoised_out rate=48000
 pacmd load-module module-ladspa-sink sink_name=mic_raw_in sink_master=mic_denoised_out label=noise_suppressor_mono plugin=/path/to/librnnoise_ladspa.so control=50,20,0,0,0
@@ -165,6 +176,7 @@ If you are absolutely sure that you want a stereo input use these options instea
 - `channels=2`
 
 If you have problems with audio crackling or high / periodically increasing latency, adding `latency_msec=1` to the loopback might help:
+
 ```
 load-module module-loopback source=your_mic_name sink=mic_raw_in channels=1 source_dont_move=true sink_dont_move=true latency_msec=1
 ```
@@ -187,11 +199,89 @@ Further reading:
 
 ### MacOS
 
-TODO, contributions are welcomed!
+#### Setting MacOS to detect RNNoise AudioUnit Plugin
+
+I'm using RNNoise AudioUnit format (file `rnnoise.component`), cause some apps can't detect vst files, such as Audio Hijack. However you can try other formats too
+
+- Extract the file `macos-rnnoise.zip` which you downloaded from the repo
+
+- Open root audio plugins folder by going `Macintosh HD/Library/Audio/Plug-Ins/` or typing in terminal `open /Library/Audio/Plug-Ins/`
+
+- Open `Components` folder and paste the file `rnnoise.component` from the extracted folder
+
+#### Install and setup required apps
+
+We need to install 2 types of app:
+
+- Audio router: to route the audio back to the input. We will be using [Loopback](https://rogueamoeba.com/loopback/) (paid) or [Blackhole](https://github.com/ExistentialAudio/BlackHole) (free)
+
+- VST/ Audio Plugin Host: to use our plugin. We will be using: [Audio Hijack](https://rogueamoeba.com/audiohijack/) (paid) or [Element](https://github.com/kushview/element) (free)
+
+##### Loopback/Blackhole + Audio Hijack:
+
+Author of Loopback and Audio Hijack - Rogueamoeba have provided a nice article to setup this: [Rogue Amoeba | Enhancing microphone input with audio effects](https://rogueamoeba.com/support/knowledgebase/?showArticle=MicEffects&product=audiohijack)
+
+You only need to follow the instruction. But instead using `AUParametricEQ` and `Sync`, you replace those and use `RNNoise suppresion for voice` in the `Audio Unit Effects` section
+
+![](images/loopback_audio_hijack.png)
+
+You can use Blackhole instead of Audio Hijack by simply changing the `Output Device`
+
+##### Loopback/Blackhole + Element (Recommend Blackhole + Element cause it's all FREE):
+
+<details>
+<summary>Click to show instruction</summary>
+
+After open Element, create a new session if the app doesn't show it
+
+Go to Options -> Audio Input Device and select your input device which you want to apply noise suppression. In my case it's Extenal Microphone.
+
+![](images/element_chose_input.png)
+
+Go to Options -> Audio Output Device and select your Blackhole/Loopback virtual device. In my case it's BlackHole 2ch
+
+![](images/element_chose_output.png)
+
+Your session will look like this:
+
+![right_input_output.png](images/right_input_output.png)
+
+Now open expand the Plugins section in the left column and search for `RNNoise suppression for voice`, drag it into the graph area
+
+![search_for_plugin.png](images/search_for_plugin.png)
+
+If you can't find it or all folders in the Plugins section are empty. Go to View -> Plugin Manager, then click `Scan` then hit `Close` and try again
+
+![scan_plugin_if_emty.png](images/scan_plugin_if_emty.png)
+
+Connect those block by selecting and draging from 1 green point to another. Follow this setup below:
+
+![element_setup_1.png](images/element_setup_1.png)
+
+I recommend putting 2 more `Volume(stereo)` to monitor the different before and after applying RNNoise as below:
+
+![element_setup_2.png](images/element_setup_2.png)
+
+**Tips:** You can test out if the setup work or not by listening to your voice and seeing the volume meter, simply changing the Output Device to your real Output Device, in my case it's External Headphones (see the Options -> Audio Output Device step)
+
+The final thing you do is going to System Preferences -> Sound -> Input and select the default input as the Output Device which you setup in Element
+
+![default_input.png](images/default_input.png)
+
+Or you can select in your app, like Discord
+
+![discord_input.png](images/discord_input.png)
+
+</details>
+
+#### Notes:
+
+If you experience some audio dropouts, or no sound from the input, simply close and open Element again. If it still happen then try restarting the Mac
 
 ## Status
 
 The plugin is tested with:
+
 - Equalizer APO v1.2 x64 (open source system-wide equalizer for Windows)
 - PipeWire on Arch Linux
 - Carla (on Linux)
@@ -208,18 +298,21 @@ Improvements are welcomed! Though if you want to contribute anything sizeable - 
 ### Compiling
 
 Compiling for x64:
+
 ```sh
 cmake -Bbuild-x64 -H. -GNinja -DCMAKE_BUILD_TYPE=Release
 ninja -C build-x64
 ```
 
 Compiling for x32:
+
 ```sh
 cmake -D CMAKE_CXX_FLAGS=-m32 -D CMAKE_C_FLAGS=-m32 -Bbuild-x32 -H. -GNinja -DCMAKE_BUILD_TYPE=Release
 ninja -C build-x32
 ```
 
 Cross-compiling for Windows x64 (MinGW builds are failing at the moment due to certain incompatibilities in JUCE):
+
 ```sh
 cmake -Bbuild-mingw64 -H. -GNinja -DCMAKE_TOOLCHAIN_FILE=toolchains/toolchain-mingw64.cmake -DCMAKE_BUILD_TYPE=Release
 ninja -C build-mingw64
@@ -248,6 +341,7 @@ cmake -DBUILD_VST_PLUGIN=OFF -DBUILD_LV2_PLUGIN=OFF
 This project is licensed under the GNU General Public License v3.0 - see the LICENSE file for details.
 
 Used libraries:
+
 - [JUCE](https://github.com/juce-framework/JUCE) is used under GPLv3 license
 - [FST](https://git.iem.at/zmoelnig/FST/) - GPLv3
 - [catch2](https://github.com/catchorg/Catch2) - BSL-1.0
