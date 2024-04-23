@@ -1,4 +1,6 @@
-/* Copyright (c) 2017 Mozilla */
+/* Copyright (c) 2024 Jean-Marc Valin
+ * Copyright (c) 2018 Gregor Richards
+ * Copyright (c) 2017 Mozilla */
 /*
    Redistribution and use in source and binary forms, with or without
    modification, are permitted provided that the following conditions
@@ -37,6 +39,7 @@
 
 #include "rnnoise/arch.h"
 #include "rnnoise/common.h"
+#include "rnnoise/cpu_support.h"
 #include "rnnoise/denoise.h"
 #include "rnnoise/kiss_fft.h"
 #include "rnnoise/pitch.h"
@@ -69,6 +72,7 @@ const int eband20ms[NB_BANDS + 2] = {
 
 struct DenoiseState {
   RNNoise model;
+  int arch;
   float analysis_mem[FRAME_SIZE];
   int memid;
   float synthesis_mem[FRAME_SIZE];
@@ -79,6 +83,10 @@ struct DenoiseState {
   float mem_hp_x[2];
   float lastg[NB_BANDS];
   RNNState rnn;
+  kiss_fft_cpx delayed_X[FREQ_SIZE];
+  kiss_fft_cpx delayed_P[FREQ_SIZE];
+  float delayed_Ex[NB_BANDS], delayed_Ep[NB_BANDS];
+  float delayed_Exp[NB_BANDS];
 };
 
 static void compute_band_energy(float *bandE, const kiss_fft_cpx *X) {
@@ -205,18 +213,23 @@ int rnnoise_get_size() { return sizeof(DenoiseState); }
 
 int rnnoise_get_frame_size() { return FRAME_SIZE; }
 
-extern const WeightArray rnnoise_arrays[];
-int rnnoise_init(DenoiseState *st, RNNModel *model) {
+int rnnoise_init(DenoiseState *st) {
   memset(st, 0, sizeof(*st));
-  init_rnnoise(&st->model, rnnoise_arrays);
-  (void)model;
+  int ret = init_rnnoise(&st->model, rnnoise_arrays);
+  if (ret != 0) return -1;
+  st->arch = rnn_select_arch();
   return 0;
 }
 
-DenoiseState *rnnoise_create(RNNModel *model) {
+DenoiseState *rnnoise_create() {
+  int ret;
   DenoiseState *st;
   st = malloc(rnnoise_get_size());
-  rnnoise_init(st, model);
+  ret = rnnoise_init(st);
+  if (ret != 0) {
+    free(st);
+    return NULL;
+  }
   return st;
 }
 
@@ -358,7 +371,7 @@ void rnn_pitch_filter(kiss_fft_cpx *X, const kiss_fft_cpx *P, const float *Ex,
 float rnnoise_process_frame(DenoiseState *st, float *out, const float *in) {
   int i;
   kiss_fft_cpx X[FREQ_SIZE];
-  kiss_fft_cpx P[WINDOW_SIZE];
+  kiss_fft_cpx P[FREQ_SIZE];
   float x[FRAME_SIZE];
   float Ex[NB_BANDS], Ep[NB_BANDS];
   float Exp[NB_BANDS];
@@ -374,7 +387,8 @@ float rnnoise_process_frame(DenoiseState *st, float *out, const float *in) {
 
   if (!silence) {
     compute_rnn(&st->model, &st->rnn, g, &vad_prob, features);
-    rnn_pitch_filter(X, P, Ex, Ep, Exp, g);
+    rnn_pitch_filter(st->delayed_X, st->delayed_P, st->delayed_Ex,
+                     st->delayed_Ep, st->delayed_Exp, g);
     for (i = 0; i < NB_BANDS; i++) {
       float alpha = .6f;
       g[i] = MAX16(g[i], alpha * st->lastg[i]);
@@ -383,12 +397,18 @@ float rnnoise_process_frame(DenoiseState *st, float *out, const float *in) {
     interp_band_gain(gf, g);
 #if 1
     for (i = 0; i < FREQ_SIZE; i++) {
-      X[i].r *= gf[i];
-      X[i].i *= gf[i];
+      st->delayed_X[i].r *= gf[i];
+      st->delayed_X[i].i *= gf[i];
     }
 #endif
   }
 
-  frame_synthesis(st, out, X);
+  frame_synthesis(st, out, st->delayed_X);
+
+  RNN_COPY(st->delayed_X, X, FREQ_SIZE);
+  RNN_COPY(st->delayed_P, P, FREQ_SIZE);
+  RNN_COPY(st->delayed_Ex, Ex, NB_BANDS);
+  RNN_COPY(st->delayed_Ep, Ep, NB_BANDS);
+  RNN_COPY(st->delayed_Exp, Exp, NB_BANDS);
   return vad_prob;
 }

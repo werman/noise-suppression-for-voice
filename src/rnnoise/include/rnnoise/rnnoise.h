@@ -62,7 +62,7 @@ RNNOISE_EXPORT int rnnoise_get_frame_size();
  *
  * See: rnnoise_create()
  */
-RNNOISE_EXPORT int rnnoise_init(DenoiseState *st, RNNModel *model);
+RNNOISE_EXPORT int rnnoise_init(DenoiseState *st);
 
 /**
  * Allocate and initialize a DenoiseState
