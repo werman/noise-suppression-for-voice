@@ -86,7 +86,7 @@ void celt_fir(const opus_val16 *x, const opus_val16 *num, opus_val16 *y, int N,
   for (i = 0; i < N - 3; i += 4) {
     opus_val32 sum[4];
     sum[0] = SHL32(EXTEND32(x[i]), SIG_SHIFT);
-    sum[1] = SHL32(EXTEND32(x[i + 1]), SIG_SHIFT),
+    sum[1] = SHL32(EXTEND32(x[i + 1]), SIG_SHIFT);
     sum[2] = SHL32(EXTEND32(x[i + 2]), SIG_SHIFT);
     sum[3] = SHL32(EXTEND32(x[i + 3]), SIG_SHIFT);
     xcorr_kernel(rnum, x + i - ord, sum, ord);

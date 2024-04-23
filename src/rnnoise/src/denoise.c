@@ -251,6 +251,8 @@ static void apply_window(float *x) {
 
 int rnnoise_get_size() { return sizeof(DenoiseState); }
 
+int rnnoise_get_frame_size() { return FRAME_SIZE; }
+
 int rnnoise_init(DenoiseState *st) {
   memset(st, 0, sizeof(*st));
   return 0;
