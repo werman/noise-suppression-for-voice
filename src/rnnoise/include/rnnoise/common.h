@@ -52,4 +52,13 @@ static RNN_INLINE void rnnoise_free(void *ptr) { free(ptr); }
 #define RNN_CLEAR(dst, n) (memset((dst), 0, (n) * sizeof(*(dst))))
 #endif
 
+#if !defined(OPUS_GNUC_PREREQ)
+#if defined(__GNUC__) && defined(__GNUC_MINOR__)
+#define OPUS_GNUC_PREREQ(_maj, _min) \
+  ((__GNUC__ << 16) + __GNUC_MINOR__ >= ((_maj) << 16) + (_min))
+#else
+#define OPUS_GNUC_PREREQ(_maj, _min) 0
+#endif
+#endif
+
 #endif

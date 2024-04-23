@@ -9,18 +9,24 @@ set(RN_NOISE_SRC
         include/rnnoise/celt_lpc.h
         include/rnnoise/common.h
         include/rnnoise/kiss_fft.h
+        include/rnnoise/nnet_arch.h
         include/rnnoise/opus_types.h
         include/rnnoise/pitch.h
         include/rnnoise/rnn.h
-        include/rnnoise/rnn_data.h
         include/rnnoise/rnnoise.h
-        include/rnnoise/tansig_table.h
+        include/rnnoise/rnnoise_data.h
+        include/rnnoise/vec.h
+        include/rnnoise/vec_avx.h
+        include/rnnoise/vec_neon.h
         src/celt_lpc.c
         src/denoise.c
         src/kiss_fft.c
+        src/nnet.c
+        src/nnet_default.c
+        src/parse_lpcnet_weights.c
         src/pitch.c
         src/rnn.c
-        src/rnn_data.c)
+        src/rnnoise_data.c)
 
 add_library(RnNoise STATIC ${RN_NOISE_SRC})
 

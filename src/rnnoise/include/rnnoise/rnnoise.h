@@ -39,6 +39,7 @@
 #endif
 
 typedef struct DenoiseState DenoiseState;
+typedef struct RNNModel RNNModel;
 
 #ifdef __cplusplus
 extern "C" {
@@ -59,9 +60,9 @@ RNNOISE_EXPORT int rnnoise_get_frame_size();
  *
  * If model is NULL the default model is used.
  *
- * See: rnnoise_create() and rnnoise_model_from_file()
+ * See: rnnoise_create()
  */
-RNNOISE_EXPORT int rnnoise_init(DenoiseState *st);
+RNNOISE_EXPORT int rnnoise_init(DenoiseState *st, RNNModel *model);
 
 /**
  * Allocate and initialize a DenoiseState

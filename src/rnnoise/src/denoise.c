@@ -40,8 +40,8 @@
 #include "rnnoise/kiss_fft.h"
 #include "rnnoise/pitch.h"
 #include "rnnoise/rnn.h"
-#include "rnnoise/rnn_data.h"
 #include "rnnoise/rnnoise.h"
+#include "rnnoise/rnnoise_data.h"
 
 #define FRAME_SIZE_SHIFT 2
 #define FRAME_SIZE (120 << FRAME_SIZE_SHIFT)
@@ -80,6 +80,7 @@ typedef struct {
 } CommonState;
 
 struct DenoiseState {
+  RNNoise model;
   float analysis_mem[FRAME_SIZE];
   float cepstral_mem[CEPS_MEM][NB_BANDS];
   int memid;
@@ -190,21 +191,6 @@ static void dct(float *out, const float *in) {
   }
 }
 
-#if 0
-static void idct(float *out, const float *in) {
-  int i;
-  check_init();
-  for (i=0;i<NB_BANDS;i++) {
-    int j;
-    float sum = 0;
-    for (j=0;j<NB_BANDS;j++) {
-      sum += in[j] * common.dct_table[i*NB_BANDS + j];
-    }
-    out[i] = sum*sqrt(2./22);
-  }
-}
-#endif
-
 static void forward_transform(kiss_fft_cpx *out, const float *in) {
   int i;
   kiss_fft_cpx x[WINDOW_SIZE];
@@ -253,15 +239,18 @@ int rnnoise_get_size() { return sizeof(DenoiseState); }
 
 int rnnoise_get_frame_size() { return FRAME_SIZE; }
 
-int rnnoise_init(DenoiseState *st) {
+extern const WeightArray rnnoise_arrays[];
+int rnnoise_init(DenoiseState *st, RNNModel *model) {
   memset(st, 0, sizeof(*st));
+  init_rnnoise(&st->model, rnnoise_arrays);
+  (void)model;
   return 0;
 }
 
-DenoiseState *rnnoise_create() {
+DenoiseState *rnnoise_create(RNNModel *model) {
   DenoiseState *st;
   st = malloc(rnnoise_get_size());
-  rnnoise_init(st);
+  rnnoise_init(st, model);
   return st;
 }
 
@@ -414,18 +403,12 @@ static void pitch_filter(kiss_fft_cpx *X, const kiss_fft_cpx *P,
   float r[NB_BANDS];
   float rf[FREQ_SIZE] = {0};
   for (i = 0; i < NB_BANDS; i++) {
-#if 0
-    if (Exp[i]>g[i]) r[i] = 1;
-    else r[i] = Exp[i]*(1-g[i])/(.001 + g[i]*(1-Exp[i]));
-    r[i] = MIN16(1, MAX16(0, r[i]));
-#else
     if (Exp[i] > g[i])
       r[i] = 1;
     else
       r[i] = SQUARE(Exp[i]) * (1 - SQUARE(g[i])) /
              (.001 + SQUARE(g[i]) * (1 - SQUARE(Exp[i])));
     r[i] = sqrt(MIN16(1, MAX16(0, r[i])));
-#endif
     r[i] *= sqrt(Ex[i] / (1e-8 + Ep[i]));
   }
   interp_band_gain(rf, r);
@@ -465,7 +448,7 @@ float rnnoise_process_frame(DenoiseState *st, float *out, const float *in) {
   silence = compute_frame_features(st, X, P, Ex, Ep, Exp, features, x);
 
   if (!silence) {
-    compute_rnn(&st->rnn, g, &vad_prob, features);
+    compute_rnn(&st->model, &st->rnn, g, &vad_prob, features);
     pitch_filter(X, P, Ex, Ep, Exp, g);
     for (i = 0; i < NB_BANDS; i++) {
       float alpha = .6f;
@@ -625,31 +608,11 @@ int main(int argc, char **argv) {
       if (vad == 0 && noise_gain == 0) g[i] = -1;
     }
     count++;
-#if 0
-    for (i=0;i<NB_FEATURES;i++) printf("%f ", features[i]);
-    for (i=0;i<NB_BANDS;i++) printf("%f ", g[i]);
-    for (i=0;i<NB_BANDS;i++) printf("%f ", Ln[i]);
-    printf("%f\n", vad);
-#endif
 #if 1
     fwrite(features, sizeof(float), NB_FEATURES, stdout);
     fwrite(g, sizeof(float), NB_BANDS, stdout);
     fwrite(Ln, sizeof(float), NB_BANDS, stdout);
     fwrite(&vad, sizeof(float), 1, stdout);
-#endif
-#if 0
-    compute_rnn(&noisy->rnn, g, &vad_prob, features);
-    interp_band_gain(gf, g);
-#if 1
-    for (i=0;i<FREQ_SIZE;i++) {
-      X[i].r *= gf[i];
-      X[i].i *= gf[i];
-    }
-#endif
-    frame_synthesis(noisy, xn, X);
-
-    for (i=0;i<FRAME_SIZE;i++) tmp[i] = xn[i];
-    fwrite(tmp, sizeof(short), FRAME_SIZE, fout);
 #endif
   }
   fprintf(stderr, "matrix size: %d x %d\n", count,
