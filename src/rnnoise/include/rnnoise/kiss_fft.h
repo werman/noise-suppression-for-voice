@@ -92,7 +92,7 @@ typedef struct kiss_fft_state {
 #endif
   int shift;
   opus_int16 factors[2 * MAXFACTORS];
-  const opus_int16 *bitrev;
+  const opus_int32 *bitrev;
   const kiss_twiddle_cpx *twiddles;
   arch_fft_state *arch_fft;
 } kiss_fft_state;

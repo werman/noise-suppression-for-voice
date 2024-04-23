@@ -67,13 +67,6 @@ const int eband20ms[NB_BANDS + 2] = {
     32,  36,  41,  47,  53,  60,  68,  77,  87,  98, 110, 124,
     140, 157, 176, 198, 223, 251, 282, 317, 356, 400};
 
-typedef struct {
-  int init;
-  kiss_fft_state *kfft;
-  float half_window[FRAME_SIZE];
-  float dct_table[NB_BANDS * NB_BANDS];
-} CommonState;
-
 struct DenoiseState {
   RNNoise model;
   float analysis_mem[FRAME_SIZE];
@@ -151,34 +144,17 @@ static void interp_band_gain(float *g, const float *bandE) {
     g[j] = bandE[NB_BANDS - 1];
 }
 
-CommonState common;
-
-static void check_init() {
-  int i;
-  if (common.init) return;
-  common.kfft = rnn_fft_alloc_twiddles(2 * FRAME_SIZE, NULL, NULL, NULL, 0);
-  for (i = 0; i < FRAME_SIZE; i++)
-    common.half_window[i] =
-        sin(.5 * M_PI * sin(.5 * M_PI * (i + .5) / FRAME_SIZE) *
-            sin(.5 * M_PI * (i + .5) / FRAME_SIZE));
-  for (i = 0; i < NB_BANDS; i++) {
-    int j;
-    for (j = 0; j < NB_BANDS; j++) {
-      common.dct_table[i * NB_BANDS + j] = cos((i + .5) * j * M_PI / NB_BANDS);
-      if (j == 0) common.dct_table[i * NB_BANDS + j] *= sqrt(.5);
-    }
-  }
-  common.init = 1;
-}
+extern const float rnn_dct_table[];
+extern const kiss_fft_state rnn_kfft;
+extern const float rnn_half_window[];
 
 static void dct(float *out, const float *in) {
   int i;
-  check_init();
   for (i = 0; i < NB_BANDS; i++) {
     int j;
     float sum = 0;
     for (j = 0; j < NB_BANDS; j++) {
-      sum += in[j] * common.dct_table[j * NB_BANDS + i];
+      sum += in[j] * rnn_dct_table[j * NB_BANDS + i];
     }
     out[i] = sum * sqrt(2. / 22);
   }
@@ -188,12 +164,11 @@ static void forward_transform(kiss_fft_cpx *out, const float *in) {
   int i;
   kiss_fft_cpx x[WINDOW_SIZE];
   kiss_fft_cpx y[WINDOW_SIZE];
-  check_init();
   for (i = 0; i < WINDOW_SIZE; i++) {
     x[i].r = in[i];
     x[i].i = 0;
   }
-  rnn_fft(common.kfft, x, y, 0);
+  rnn_fft(&rnn_kfft, x, y, 0);
   for (i = 0; i < FREQ_SIZE; i++) {
     out[i] = y[i];
   }
@@ -203,7 +178,6 @@ static void inverse_transform(float *out, const kiss_fft_cpx *in) {
   int i;
   kiss_fft_cpx x[WINDOW_SIZE];
   kiss_fft_cpx y[WINDOW_SIZE];
-  check_init();
   for (i = 0; i < FREQ_SIZE; i++) {
     x[i] = in[i];
   }
@@ -211,7 +185,7 @@ static void inverse_transform(float *out, const kiss_fft_cpx *in) {
     x[i].r = x[WINDOW_SIZE - i].r;
     x[i].i = -x[WINDOW_SIZE - i].i;
   }
-  rnn_fft(common.kfft, x, y, 0);
+  rnn_fft(&rnn_kfft, x, y, 0);
   /* output in reverse order for IFFT. */
   out[0] = WINDOW_SIZE * y[0].r;
   for (i = 1; i < WINDOW_SIZE; i++) {
@@ -221,10 +195,9 @@ static void inverse_transform(float *out, const kiss_fft_cpx *in) {
 
 static void apply_window(float *x) {
   int i;
-  check_init();
   for (i = 0; i < FRAME_SIZE; i++) {
-    x[i] *= common.half_window[i];
-    x[WINDOW_SIZE - 1 - i] *= common.half_window[i];
+    x[i] *= rnn_half_window[i];
+    x[WINDOW_SIZE - 1 - i] *= rnn_half_window[i];
   }
 }
 

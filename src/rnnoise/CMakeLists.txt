@@ -29,7 +29,8 @@ set(RN_NOISE_SRC
         src/parse_lpcnet_weights.c
         src/pitch.c
         src/rnn.c
-        src/rnnoise_data.c)
+        src/rnnoise_data.c
+        src/rnnoise_tables.c)
 
 add_library(RnNoise STATIC ${RN_NOISE_SRC})
 
