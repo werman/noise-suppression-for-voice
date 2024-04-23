@@ -54,7 +54,7 @@
 
 #define SQUARE(x) ((x) * (x))
 
-#define NB_BANDS 22
+#define NB_BANDS 32
 
 #define CEPS_MEM 8
 
@@ -64,11 +64,22 @@
 #define TRAINING 0
 #endif
 
+/* ERB bandwidths going in reverse from 20 kHz and then replacing the 700 and
+   800 with just 750 because having 32 bands is convenient for the DNN.
+   B(1)=400;
+   for k=2:35
+     B(k) = B(k-1) - max(2, round(24.7*(4.37*B(k-1)/20+1)/50));
+   end
+   printf("%d, ", B(end:-1:1));
+   printf("\n")
+*/
 static const opus_int16 eband20ms[NB_BANDS + 2] = {
-    /*0  200 400 600 800  1k 1.2 1.4 1.6  2k 2.4 2.8 3.2 3.8 4.4 5k   5.8  6.8
-       8k   9.6 11.4 13.6 16.6  20k */
-    0,  4,  8,  12,  16,  20,  24,  28,  32,  40,  48,  56,
-    64, 76, 88, 100, 116, 136, 160, 192, 228, 272, 332, 400};
+    /*0 100 200 300 400 500 600 750
+       900 1.1 1.2 1.4 1.6 1.8 2.1 2.4 2.7 3.0 3.4 3.9 4.4 4.9  5.5  6.2  7.0  7.9
+       8.8  9.9 11.2 12.6 14.1 15.9 17.8 20.0*/
+    0,   2,   4,   6,   8,   10,  12,  15,  18,  21, 24,  28,
+    32,  36,  41,  47,  53,  60,  68,  77,  87,  98, 110, 124,
+    140, 157, 176, 198, 223, 251, 282, 317, 356, 400};
 
 typedef struct {
   int init;
