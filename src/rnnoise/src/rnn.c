@@ -68,7 +68,8 @@ static OPUS_INLINE float sigmoid_approx(float x) {
 
 static OPUS_INLINE float relu(float x) { return x < 0 ? 0 : x; }
 
-void compute_dense(const DenseLayer *layer, float *output, const float *input) {
+static void compute_dense(const DenseLayer *layer, float *output,
+                          const float *input) {
   int i, j;
   int N, M;
   int stride;
@@ -93,7 +94,7 @@ void compute_dense(const DenseLayer *layer, float *output, const float *input) {
   }
 }
 
-void compute_gru(const GRULayer *gru, float *state, const float *input) {
+static void compute_gru(const GRULayer *gru, float *state, const float *input) {
   int i, j;
   int N, M;
   int stride;

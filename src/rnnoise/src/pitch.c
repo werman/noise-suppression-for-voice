@@ -35,13 +35,11 @@
 #include "config.h"
 #endif
 
+#include <math.h>
+
+#include "rnnoise/celt_lpc.h"
 #include "rnnoise/common.h"
 #include "rnnoise/pitch.h"
-// #include "modes.h"
-// #include "stack_alloc.h"
-// #include "mathops.h"
-#include "math.h"
-#include "rnnoise/celt_lpc.h"
 
 static void find_best_pitch(opus_val32 *xcorr, opus_val16 *y, int len,
                             int max_pitch, int *best_pitch
@@ -136,7 +134,7 @@ static void celt_fir5(const opus_val16 *x, const opus_val16 *num, opus_val16 *y,
   mem[4] = mem4;
 }
 
-void pitch_downsample(celt_sig *x[], opus_val16 *x_lp, int len, int C) {
+void rnn_pitch_downsample(celt_sig *x[], opus_val16 *x_lp, int len, int C) {
   int i;
   opus_val32 ac[5];
   opus_val16 tmp = Q15ONE;
@@ -168,7 +166,7 @@ void pitch_downsample(celt_sig *x[], opus_val16 *x_lp, int len, int C) {
     x_lp[0] += SHR32(HALF32(HALF32(x[1][1]) + x[1][0]), shift);
   }
 
-  _celt_autocorr(x_lp, ac, NULL, 0, 4, len >> 1);
+  rnn_autocorr(x_lp, ac, NULL, 0, 4, len >> 1);
 
   /* Noise floor -40 dB */
 #ifdef FIXED_POINT
@@ -186,7 +184,7 @@ void pitch_downsample(celt_sig *x[], opus_val16 *x_lp, int len, int C) {
 #endif
   }
 
-  _celt_lpc(lpc, ac, 4);
+  rnn_lpc(lpc, ac, 4);
   for (i = 0; i < 4; i++) {
     tmp = MULT16_16_Q15(QCONST16(.9f, 15), tmp);
     lpc[i] = MULT16_16_Q15(lpc[i], tmp);
@@ -200,8 +198,8 @@ void pitch_downsample(celt_sig *x[], opus_val16 *x_lp, int len, int C) {
   celt_fir5(x_lp, lpc2, x_lp, len >> 1, mem);
 }
 
-void celt_pitch_xcorr(const opus_val16 *_x, const opus_val16 *_y,
-                      opus_val32 *xcorr, int len, int max_pitch) {
+void rnn_pitch_xcorr(const opus_val16 *_x, const opus_val16 *_y,
+                     opus_val32 *xcorr, int len, int max_pitch) {
 #if 0 /* This is a simple version of the pitch correlation that should work \
          well on DSPs like Blackfin and TI C5x/C6x */
    int i, j;
@@ -262,8 +260,8 @@ void celt_pitch_xcorr(const opus_val16 *_x, const opus_val16 *_y,
 #endif
 }
 
-void pitch_search(const opus_val16 *x_lp, opus_val16 *y, int len, int max_pitch,
-                  int *pitch) {
+void rnn_pitch_search(const opus_val16 *x_lp, opus_val16 *y, int len,
+                      int max_pitch, int *pitch) {
   int i, j;
   int lag;
   int best_pitch[2] = {0, 0};
@@ -306,7 +304,7 @@ void pitch_search(const opus_val16 *x_lp, opus_val16 *y, int len, int max_pitch,
 #ifdef FIXED_POINT
   maxcorr =
 #endif
-      celt_pitch_xcorr(x_lp4, y_lp4, xcorr, len >> 2, max_pitch >> 2);
+      rnn_pitch_xcorr(x_lp4, y_lp4, xcorr, len >> 2, max_pitch >> 2);
 
   find_best_pitch(xcorr, y_lp4, len >> 2, max_pitch >> 2, best_pitch
 #ifdef FIXED_POINT
@@ -396,8 +394,9 @@ static opus_val16 compute_pitch_gain(opus_val32 xy, opus_val32 xx,
 
 static const int second_check[16] = {0, 0, 3, 2, 3, 2, 5, 2,
                                      3, 2, 3, 2, 5, 2, 3, 2};
-opus_val16 remove_doubling(opus_val16 *x, int maxperiod, int minperiod, int N,
-                           int *T0_, int prev_period, opus_val16 prev_gain) {
+opus_val16 rnn_remove_doubling(opus_val16 *x, int maxperiod, int minperiod,
+                               int N, int *T0_, int prev_period,
+                               opus_val16 prev_gain) {
   int k, i, T, T0;
   opus_val16 g, g0;
   opus_val16 pg;
