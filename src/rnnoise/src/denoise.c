@@ -44,11 +44,6 @@
 #include "rnnoise/rnnoise.h"
 #include "rnnoise/rnnoise_data.h"
 
-#define PITCH_MIN_PERIOD 60
-#define PITCH_MAX_PERIOD 768
-#define PITCH_FRAME_SIZE 960
-#define PITCH_BUF_SIZE (PITCH_MAX_PERIOD + PITCH_FRAME_SIZE)
-
 #define SQUARE(x) ((x) * (x))
 
 #ifndef TRAINING
@@ -359,6 +354,9 @@ void rnn_pitch_filter(kiss_fft_cpx *X, const kiss_fft_cpx *P, const float *Ex,
   int i;
   float r[NB_BANDS];
   float rf[FREQ_SIZE] = {0};
+  float newE[NB_BANDS];
+  float norm[NB_BANDS];
+  float normf[FREQ_SIZE] = {0};
   for (i = 0; i < NB_BANDS; i++) {
     if (Exp[i] > g[i])
       r[i] = 1;
@@ -373,10 +371,7 @@ void rnn_pitch_filter(kiss_fft_cpx *X, const kiss_fft_cpx *P, const float *Ex,
     X[i].r += rf[i] * P[i].r;
     X[i].i += rf[i] * P[i].i;
   }
-  float newE[NB_BANDS];
   compute_band_energy(newE, X);
-  float norm[NB_BANDS];
-  float normf[FREQ_SIZE] = {0};
   for (i = 0; i < NB_BANDS; i++) {
     norm[i] = sqrt(Ex[i] / (1e-8 + newE[i]));
   }

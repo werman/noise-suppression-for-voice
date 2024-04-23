@@ -32,6 +32,7 @@
 #include "rnnoise/arch.h"
 #include "rnnoise/celt_lpc.h"
 #include "rnnoise/common.h"
+#include "rnnoise/denoise.h"
 #include "rnnoise/pitch.h"
 
 void rnn_lpc(opus_val16 *_lpc,     /* out: [0...p-1] LPC coefficients      */
@@ -86,8 +87,9 @@ int rnn_autocorr(const opus_val16 *x, /*  in: [0...n-1] samples x   */
   int fastN = n - lag;
   int shift;
   const opus_val16 *xptr;
-  opus_val16 *xx = alloca(sizeof(opus_val16) * n);
+  opus_val16 *xx = alloca(sizeof(opus_val16) * PITCH_BUF_SIZE / 2);
   celt_assert(n > 0);
+  celt_assert(n <= PITCH_BUF_SIZE / 2);
   celt_assert(overlap >= 0);
   if (overlap == 0) {
     xptr = x;

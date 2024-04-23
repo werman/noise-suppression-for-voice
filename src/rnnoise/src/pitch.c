@@ -39,6 +39,7 @@
 
 #include "rnnoise/celt_lpc.h"
 #include "rnnoise/common.h"
+#include "rnnoise/denoise.h"
 #include "rnnoise/pitch.h"
 
 static void find_best_pitch(opus_val32 *xcorr, opus_val16 *y, int len,
@@ -271,15 +272,16 @@ void rnn_pitch_search(const opus_val16 *x_lp, opus_val16 *y, int len,
   int shift = 0;
 #endif
   int offset;
+  opus_val16 *x_lp4 = alloca(sizeof(opus_val16) * (PITCH_FRAME_SIZE >> 2));
+  opus_val16 *y_lp4 =
+      alloca(sizeof(opus_val16) * ((PITCH_FRAME_SIZE + PITCH_MAX_PERIOD) >> 2));
+  opus_val32 *xcorr = alloca(sizeof(opus_val16) * (PITCH_MAX_PERIOD >> 1));
 
+  celt_assert(len <= PITCH_FRAME_SIZE);
+  celt_assert(max_pitch <= PITCH_MAX_PERIOD);
   celt_assert(len > 0);
   celt_assert(max_pitch > 0);
   lag = len + max_pitch;
-
-  opus_val16 *x_lp4 = alloca(sizeof(opus_val16) * (len >> 2));
-  opus_val16 *y_lp4 = alloca(sizeof(opus_val16) * (lag >> 2));
-  opus_val32 *xcorr = alloca(sizeof(opus_val16) * (max_pitch >> 1));
-  ;
 
   /* Downsample by 2 again */
   for (j = 0; j < len >> 2; j++) x_lp4[j] = x_lp[2 * j];
@@ -405,6 +407,9 @@ opus_val16 rnn_remove_doubling(opus_val16 *x, int maxperiod, int minperiod,
   opus_val32 best_xy, best_yy;
   int offset;
   int minperiod0;
+  opus_val32 *yy_lookup = alloca(sizeof(opus_val32) * (PITCH_MAX_PERIOD + 1));
+
+  celt_assert(maxperiod <= PITCH_MAX_PERIOD);
 
   minperiod0 = minperiod;
   maxperiod /= 2;
@@ -416,7 +421,6 @@ opus_val16 rnn_remove_doubling(opus_val16 *x, int maxperiod, int minperiod,
   if (*T0_ >= maxperiod) *T0_ = maxperiod - 1;
 
   T = T0 = *T0_;
-  opus_val32 *yy_lookup = alloca(sizeof(opus_val32) * (maxperiod + 1));
   dual_inner_prod(x, x, x - T0, N, &xx, &xy);
   yy_lookup[0] = xx;
   yy = xx;
