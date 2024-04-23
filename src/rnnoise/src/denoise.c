@@ -55,13 +55,7 @@
 
 #define SQUARE(x) ((x) * (x))
 
-#define SMOOTH_BANDS 1
-
-#if SMOOTH_BANDS
 #define NB_BANDS 22
-#else
-#define NB_BANDS 21
-#endif
 
 #define CEPS_MEM 8
 #define NB_DELTA_CEPS 6
@@ -99,7 +93,6 @@ struct DenoiseState {
   RNNState rnn;
 };
 
-#if SMOOTH_BANDS
 void compute_band_energy(float *bandE, const kiss_fft_cpx *X) {
   int i;
   float sum[NB_BANDS] = {0};
@@ -163,30 +156,6 @@ void interp_band_gain(float *g, const float *bandE) {
     }
   }
 }
-#else
-void compute_band_energy(float *bandE, const kiss_fft_cpx *X) {
-  int i;
-  for (i = 0; i < NB_BANDS; i++) {
-    int j;
-    opus_val32 sum = 0;
-    for (j = 0; j < (eband5ms[i + 1] - eband5ms[i]) << FRAME_SIZE_SHIFT; j++) {
-      sum += SQUARE(X[(eband5ms[i] << FRAME_SIZE_SHIFT) + j].r);
-      sum += SQUARE(X[(eband5ms[i] << FRAME_SIZE_SHIFT) + j].i);
-    }
-    bandE[i] = sum;
-  }
-}
-
-void interp_band_gain(float *g, const float *bandE) {
-  int i;
-  memset(g, 0, FREQ_SIZE);
-  for (i = 0; i < NB_BANDS; i++) {
-    int j;
-    for (j = 0; j < (eband5ms[i + 1] - eband5ms[i]) << FRAME_SIZE_SHIFT; j++)
-      g[(eband5ms[i] << FRAME_SIZE_SHIFT) + j] = bandE[i];
-  }
-}
-#endif
 
 CommonState common;
 
