@@ -43,8 +43,7 @@
 #include "rnnoise/rnnoise.h"
 #include "rnnoise/rnnoise_data.h"
 
-#define FRAME_SIZE_SHIFT 2
-#define FRAME_SIZE (120 << FRAME_SIZE_SHIFT)
+#define FRAME_SIZE 480
 #define WINDOW_SIZE (2 * FRAME_SIZE)
 #define FREQ_SIZE (FRAME_SIZE + 1)
 
@@ -66,11 +65,11 @@
 #define TRAINING 0
 #endif
 
-static const opus_int16 eband5ms[] = {
-    /*0  200 400 600 800  1k 1.2 1.4 1.6  2k 2.4 2.8 3.2  4k 4.8 5.6 6.8  8k 9.6
-       12k 15.6 20k*/
-    0,  1,  2,  3,  4,  5,  6,  7,  8,  10, 12,
-    14, 16, 20, 24, 28, 34, 40, 48, 60, 78, 100};
+static const opus_int16 eband20ms[NB_BANDS + 2] = {
+    /*0  200 400 600 800  1k 1.2 1.4 1.6  2k 2.4 2.8 3.2 3.8 4.4 5k   5.8  6.8
+       8k   9.6 11.4 13.6 16.6  20k */
+    0,  4,  8,  12,  16,  20,  24,  28,  32,  40,  48,  56,
+    64, 76, 88, 100, 116, 136, 160, 192, 228, 272, 332, 400};
 
 typedef struct {
   int init;
@@ -96,66 +95,65 @@ struct DenoiseState {
 
 static void compute_band_energy(float *bandE, const kiss_fft_cpx *X) {
   int i;
-  float sum[NB_BANDS] = {0};
-  for (i = 0; i < NB_BANDS - 1; i++) {
+  float sum[NB_BANDS + 2] = {0};
+  for (i = 0; i < NB_BANDS + 1; i++) {
     int j;
     int band_size;
-    band_size = (eband5ms[i + 1] - eband5ms[i]) << FRAME_SIZE_SHIFT;
+    band_size = eband20ms[i + 1] - eband20ms[i];
     for (j = 0; j < band_size; j++) {
       float tmp;
       float frac = (float)j / band_size;
-      tmp = SQUARE(X[(eband5ms[i] << FRAME_SIZE_SHIFT) + j].r);
-      tmp += SQUARE(X[(eband5ms[i] << FRAME_SIZE_SHIFT) + j].i);
+      tmp = SQUARE(X[eband20ms[i] + j].r);
+      tmp += SQUARE(X[eband20ms[i] + j].i);
       sum[i] += (1 - frac) * tmp;
       sum[i + 1] += frac * tmp;
     }
   }
-  sum[0] *= 2;
-  sum[NB_BANDS - 1] *= 2;
+  sum[1] = (sum[0] + sum[1]) * 2 / 3;
+  sum[NB_BANDS] = (sum[NB_BANDS] + sum[NB_BANDS + 1]) * 2 / 3;
   for (i = 0; i < NB_BANDS; i++) {
-    bandE[i] = sum[i];
+    bandE[i] = sum[i + 1];
   }
 }
 
 static void compute_band_corr(float *bandE, const kiss_fft_cpx *X,
                               const kiss_fft_cpx *P) {
   int i;
-  float sum[NB_BANDS] = {0};
-  for (i = 0; i < NB_BANDS - 1; i++) {
+  float sum[NB_BANDS + 2] = {0};
+  for (i = 0; i < NB_BANDS + 1; i++) {
     int j;
     int band_size;
-    band_size = (eband5ms[i + 1] - eband5ms[i]) << FRAME_SIZE_SHIFT;
+    band_size = eband20ms[i + 1] - eband20ms[i];
     for (j = 0; j < band_size; j++) {
       float tmp;
       float frac = (float)j / band_size;
-      tmp = X[(eband5ms[i] << FRAME_SIZE_SHIFT) + j].r *
-            P[(eband5ms[i] << FRAME_SIZE_SHIFT) + j].r;
-      tmp += X[(eband5ms[i] << FRAME_SIZE_SHIFT) + j].i *
-             P[(eband5ms[i] << FRAME_SIZE_SHIFT) + j].i;
+      tmp = X[eband20ms[i] + j].r * P[eband20ms[i] + j].r;
+      tmp += X[eband20ms[i] + j].i * P[eband20ms[i] + j].i;
       sum[i] += (1 - frac) * tmp;
       sum[i + 1] += frac * tmp;
     }
   }
-  sum[0] *= 2;
-  sum[NB_BANDS - 1] *= 2;
+  sum[1] = (sum[0] + sum[1]) * 2 / 3;
+  sum[NB_BANDS] = (sum[NB_BANDS] + sum[NB_BANDS + 1]) * 2 / 3;
   for (i = 0; i < NB_BANDS; i++) {
-    bandE[i] = sum[i];
+    bandE[i] = sum[i + 1];
   }
 }
 
 static void interp_band_gain(float *g, const float *bandE) {
-  int i;
+  int i, j;
   memset(g, 0, FREQ_SIZE);
-  for (i = 0; i < NB_BANDS - 1; i++) {
-    int j;
+  for (i = 1; i < NB_BANDS; i++) {
     int band_size;
-    band_size = (eband5ms[i + 1] - eband5ms[i]) << FRAME_SIZE_SHIFT;
+    band_size = eband20ms[i + 1] - eband20ms[i];
     for (j = 0; j < band_size; j++) {
       float frac = (float)j / band_size;
-      g[(eband5ms[i] << FRAME_SIZE_SHIFT) + j] =
-          (1 - frac) * bandE[i] + frac * bandE[i + 1];
+      g[eband20ms[i] + j] = (1 - frac) * bandE[i - 1] + frac * bandE[i];
     }
   }
+  for (j = 0; j < eband20ms[1]; j++) g[j] = bandE[0];
+  for (j = eband20ms[NB_BANDS]; j < eband20ms[NB_BANDS + 1]; j++)
+    g[j] = bandE[NB_BANDS - 1];
 }
 
 CommonState common;
