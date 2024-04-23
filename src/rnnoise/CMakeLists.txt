@@ -8,7 +8,9 @@ set(RN_NOISE_SRC
         include/rnnoise/arch.h
         include/rnnoise/celt_lpc.h
         include/rnnoise/common.h
+        include/rnnoise/denoise.h
         include/rnnoise/kiss_fft.h
+        include/rnnoise/nnet.h
         include/rnnoise/nnet_arch.h
         include/rnnoise/opus_types.h
         include/rnnoise/pitch.h
@@ -18,6 +20,7 @@ set(RN_NOISE_SRC
         include/rnnoise/vec.h
         include/rnnoise/vec_avx.h
         include/rnnoise/vec_neon.h
+        include/rnnoise/x86/x86_arch_macros.h
         src/celt_lpc.c
         src/denoise.c
         src/kiss_fft.c
