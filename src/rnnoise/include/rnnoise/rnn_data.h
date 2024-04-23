@@ -29,5 +29,4 @@ struct RNNState {
   float denoise_gru_state[DENOISE_GRU_SIZE];
 };
 
-
 #endif
