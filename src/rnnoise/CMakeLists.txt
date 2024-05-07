@@ -3,24 +3,8 @@ project(RnNoise LANGUAGES C)
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
+include_directories(include/rnnoise)
 set(RN_NOISE_SRC
-        include/rnnoise/_kiss_fft_guts.h
-        include/rnnoise/arch.h
-        include/rnnoise/celt_lpc.h
-        include/rnnoise/common.h
-        include/rnnoise/denoise.h
-        include/rnnoise/kiss_fft.h
-        include/rnnoise/nnet.h
-        include/rnnoise/nnet_arch.h
-        include/rnnoise/opus_types.h
-        include/rnnoise/pitch.h
-        include/rnnoise/rnn.h
-        include/rnnoise/rnnoise.h
-        include/rnnoise/rnnoise_data.h
-        include/rnnoise/vec.h
-        include/rnnoise/vec_avx.h
-        include/rnnoise/vec_neon.h
-        include/rnnoise/x86/x86_arch_macros.h
         src/celt_lpc.c
         src/denoise.c
         src/kiss_fft.c
@@ -31,6 +15,24 @@ set(RN_NOISE_SRC
         src/rnn.c
         src/rnnoise_data.c
         src/rnnoise_tables.c)
+
+if(BUILD_RTCD)
+        add_compile_definitions(CPU_INFO_BY_ASM)
+        add_compile_definitions(RNN_ENABLE_X86_RTCD)
+        if(MSVC)
+                set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /arch:AVX /arch:AVX2 /arch:FMA")
+                set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /arch:SSE4.1")
+        else()
+                set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mavx -mfma -mavx2")
+                set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -msse4.1")
+        endif()
+        list(APPEND RN_NOISE_SRC
+                src/x86/x86cpu.c
+                src/x86/x86_dnn_map.c
+                src/x86/nnet_avx2.c
+                src/x86/nnet_sse4_1.c
+        )
+endif()
 
 add_library(RnNoise STATIC ${RN_NOISE_SRC})
 
