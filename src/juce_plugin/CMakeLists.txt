@@ -30,6 +30,7 @@ else()
 endif()
 
 function(compile_plugins formats suffix default_channels)
+    string(REPLACE "_" "" URI_SUFFIX "${suffix}")
     set(PLUGIN_NAME "${PROJECT_NAME}${suffix}")
 
     juce_add_plugin(${PLUGIN_NAME}
@@ -42,7 +43,7 @@ function(compile_plugins formats suffix default_channels)
             PLUGIN_CODE Rnn1               # A unique four-character plugin id with at least one upper-case character
             FORMATS "${formats}"
             PRODUCT_NAME "rnnoise${suffix}"
-            LV2URI "https://github.com/werman/noise-suppression-for-voice"
+            LV2URI "https://github.com/werman/noise-suppression-for-voice#${URI_SUFFIX}"
             VST_COPY_DIR "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/vst"
             VST3_COPY_DIR "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}"
             AU_COPY_DIR "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}"
