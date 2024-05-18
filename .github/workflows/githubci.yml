@@ -26,8 +26,8 @@ jobs:
       matrix:
         config:
           - {
-            name: "Windows Latest MSVC",
-            os: windows-latest,
+            name: "Windows MSVC",
+            os: windows-2019,
             cc: "cl", cxx: "cl",
             build_params: "--config Release",
             artifact_prefix: "win"
