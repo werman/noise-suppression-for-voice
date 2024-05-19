@@ -187,7 +187,16 @@ Further reading:
 
 ### MacOS
 
-TODO, contributions are welcomed!
+#### Installing VST Plugins within Audacity
+
+1. Download the latest MacOS release (`macos-rnnoise.zip`)
+2. Extract files (with Archive Utility or your chosen unzip utility)
+3. Copy files to `/Library/Audio/Plug-Ins/VST`:
+    * Audacity **v3.2 or above**: copy `rnnoise.vst3`
+    * Audacity **(other versions)**: copy both `rnnoise_mono.vst` and `rnnoise_stereo.vst`
+4. Remove plugins from Apple quarantine from the terminal (otherwise MacOS won't allow you to enable the plugins from within Audacity):
+    * `sudo xattr -d com.apple.quarantine /Library/Audio/Plug-Ins/VST/rnnoise*.vst*`
+5. Enable plugins within Audacity via `Effect > Add / Remove Plug-ins`
 
 ## Status
 
