@@ -187,7 +187,19 @@ Further reading:
 
 ### MacOS
 
-TODO, contributions are welcomed!
+<!-- TODO, contributions are welcomed! -->
+
+#### VST2 + OBS
+
+After downloading the plug-ins, copy them to
+
+- /Library/Audio/Plug-Ins/Components/rnnoise.component
+- /Library/Audio/Plug-Ins/VST/rnnoise_mono.vst
+- /Library/Audio/Plug-Ins/VST/rnnoise_stereo.vst
+
+Then restart OBS and select any audio input
+
+To enable plug-ins in OBS, select "Filters", add "VST 2.x Plug-in", you can see "rnnoise_mono"
 
 ## Status
 
