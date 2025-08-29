@@ -37,6 +37,10 @@ private:
     juce::Slider m_vadRetroactiveGracePeriodSlider;
     std::unique_ptr<SliderAttachment> m_vadRetroactiveGracePeriodAttachment;
 
+    juce::Label m_dryWetLabel;
+    juce::Slider m_dryWetSlider;
+    std::unique_ptr<SliderAttachment> m_dryWetAttachment;
+
     juce::Label m_statsHeaderLabel;
     juce::Label m_statsVadGraceBlocksLabel;
     juce::Label m_statsRetroactiveVadGraceBlocksLabel;

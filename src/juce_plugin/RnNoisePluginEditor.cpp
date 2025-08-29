@@ -18,6 +18,7 @@ RnNoiseAudioProcessorEditor::RnNoiseAudioProcessorEditor(RnNoiseAudioProcessor &
     auto vadThresholdParam = m_processorRef.m_parameters.getParameter("vad_threshold");
     auto vadGracePeriodParam = m_processorRef.m_parameters.getParameter("vad_grace_period");
     auto vadRetroactiveGracePeriodParam = m_processorRef.m_parameters.getParameter("vad_retroactive_grace_period");
+    auto dryWetParam = m_processorRef.m_parameters.getParameter("dry_wet");
 
     m_vadThresholdLabel.setText(vadThresholdParam->getName(99), juce::dontSendNotification);
     addAndMakeVisible(m_vadThresholdLabel);
@@ -40,6 +41,13 @@ RnNoiseAudioProcessorEditor::RnNoiseAudioProcessorEditor(RnNoiseAudioProcessor &
     m_vadRetroactiveGracePeriodAttachment = std::make_unique<SliderAttachment>(m_valueTreeState,
                                                                                vadRetroactiveGracePeriodParam->getParameterID(),
                                                                                m_vadRetroactiveGracePeriodSlider);
+
+    m_dryWetLabel.setText(dryWetParam->getName(99), juce::dontSendNotification);
+    addAndMakeVisible(m_dryWetLabel);
+    addAndMakeVisible(m_dryWetSlider);
+    m_dryWetAttachment = std::make_unique<SliderAttachment>(m_valueTreeState,
+                                                            dryWetParam->getParameterID(),
+                                                            m_dryWetSlider);
 
     addAndMakeVisible(m_statsHeaderLabel);
     m_statsHeaderLabel.setText("Debug Statistics (updated once per second)", juce::dontSendNotification);
@@ -77,6 +85,9 @@ void RnNoiseAudioProcessorEditor::resized() {
             juce::FlexItem(m_vadRetroactiveGracePeriodLabel).withWidth(width).withFlex(1.0));
     flexBox.items.add(
             juce::FlexItem(m_vadRetroactiveGracePeriodSlider).withWidth(width).withFlex(1.0));
+
+    flexBox.items.add(juce::FlexItem(m_dryWetLabel).withWidth(width).withFlex(1.0));
+    flexBox.items.add(juce::FlexItem(m_dryWetSlider).withWidth(width).withFlex(1.0));
 
     flexBox.items.add(
             juce::FlexItem(m_statsHeaderLabel).withWidth(width).withFlex(1.0));

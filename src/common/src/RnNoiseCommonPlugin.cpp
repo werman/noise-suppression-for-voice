@@ -176,6 +176,7 @@ RnNoiseCommonPlugin::process(const float *const *in, float **out, size_t sampleF
     }
 
     bool hasEnoughFrames = !m_channels[0].rnnoiseOutput.empty();
+    size_t queuedFramesAtStart = 0;
     if (hasEnoughFrames)
     {
         int32_t blockIdxRelative = static_cast<int32_t>(m_newOutputIdx - m_currentOutputIdxToOutput) - 1;
@@ -184,6 +185,7 @@ RnNoiseCommonPlugin::process(const float *const *in, float **out, size_t sampleF
         size_t firstBlockFrames =
                 k_denoiseBlockSize - m_channels[0].rnnoiseOutput.rbegin()[blockIdxRelative]->curOffset;
         size_t totalFrames = blockIdxRelative * k_denoiseBlockSize + firstBlockFrames;
+        queuedFramesAtStart = totalFrames;
         hasEnoughFrames = totalFrames >= (sampleFrames + k_denoiseBlockSize * retroactiveVADGraceBlocks);
     }
 
@@ -197,9 +199,14 @@ RnNoiseCommonPlugin::process(const float *const *in, float **out, size_t sampleF
 
         stats.outputFramesForcedToBeZeroed += sampleFrames;
         stats.blocksWaitingForOutput = 0;
+        stats.samplesWaitingForOutput = 0;
         m_stats.store(stats);
         return;
     }
+
+    // Report exact queued frames at the start of this copy step as the precise latency in samples
+    stats.samplesWaitingForOutput = queuedFramesAtStart;
+    m_stats.store(stats);
 
     uint64_t newOutputIdxToOutput = 0;
     for (auto &channel: m_channels) {

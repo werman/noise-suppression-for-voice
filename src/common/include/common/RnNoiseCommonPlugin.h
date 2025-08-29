@@ -18,6 +18,10 @@ struct RnNoiseStats {
     /* How many blocks are in an output queue in a single channel. Represents current latency. */
     uint32_t blocksWaitingForOutput;
 
+    /* Exact number of frames currently queued in the output (includes partial block).
+     * This is the precise sample latency at the start of a processing call. */
+    uint64_t samplesWaitingForOutput;
+
     /* How many output frames we are forced to zero out because there is not enough frames to write. */
     uint64_t outputFramesForcedToBeZeroed;
 };
