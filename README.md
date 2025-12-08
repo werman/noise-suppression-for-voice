@@ -187,7 +187,17 @@ Further reading:
 
 ### MacOS
 
-TODO, contributions are welcomed!
+Downloadad and Unzip macos-rnnoise
+
+Locate `/Library/Audio/Plug-Ins/` (cmd + shift + g then paste). Then move `rnnoise_mono.vst` and `rnnoise_stereo.vst` into the VST folder and `rnnoise.vst3` into the VST3 folder.
+
+Open the terminal app and run the following on each version to allow apps to use it
+```
+xattr -d com.apple.quarantine <path to file>
+```
+![QuickTime movie](https://github.com/user-attachments/assets/2bd76a8a-b12d-4adb-a84b-64d3e4ccfbab)
+
+Now it should work in any app
 
 ## Status
 
