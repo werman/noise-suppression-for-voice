@@ -43,15 +43,18 @@
 
 void compute_rnn(const RNNoise *model, RNNState *rnn, float *gains, float *vad, const float *input, int arch) {
   float tmp[MAX_NEURONS];
-  float tmp2[MAX_NEURONS];
+  float cat[CONV2_OUT_SIZE + GRU1_OUT_SIZE + GRU2_OUT_SIZE + GRU3_OUT_SIZE];
   /*for (int i=0;i<INPUT_SIZE;i++) printf("%f ", input[i]);printf("\n");*/
   compute_generic_conv1d(&model->conv1, tmp, rnn->conv1_state, input, CONV1_IN_SIZE, ACTIVATION_TANH, arch);
-  compute_generic_conv1d(&model->conv2, tmp2, rnn->conv2_state, tmp, CONV2_IN_SIZE, ACTIVATION_TANH, arch);
-  compute_generic_gru(&model->gru1_input, &model->gru1_recurrent, rnn->gru1_state, tmp2, arch);
+  compute_generic_conv1d(&model->conv2, cat, rnn->conv2_state, tmp, CONV2_IN_SIZE, ACTIVATION_TANH, arch);
+  compute_generic_gru(&model->gru1_input, &model->gru1_recurrent, rnn->gru1_state, cat, arch);
   compute_generic_gru(&model->gru2_input, &model->gru2_recurrent, rnn->gru2_state, rnn->gru1_state, arch);
   compute_generic_gru(&model->gru3_input, &model->gru3_recurrent, rnn->gru3_state, rnn->gru2_state, arch);
-  compute_generic_dense(&model->dense_out, gains, rnn->gru3_state, ACTIVATION_SIGMOID, arch);
-  compute_generic_dense(&model->vad_dense, vad, rnn->gru3_state, ACTIVATION_SIGMOID, arch);
+  RNN_COPY(&cat[CONV2_OUT_SIZE], rnn->gru1_state, GRU1_OUT_SIZE);
+  RNN_COPY(&cat[CONV2_OUT_SIZE+GRU1_OUT_SIZE], rnn->gru2_state, GRU2_OUT_SIZE);
+  RNN_COPY(&cat[CONV2_OUT_SIZE+GRU1_OUT_SIZE+GRU2_OUT_SIZE], rnn->gru3_state, GRU3_OUT_SIZE);
+  compute_generic_dense(&model->dense_out, gains, cat, ACTIVATION_SIGMOID, arch);
+  compute_generic_dense(&model->vad_dense, vad, cat, ACTIVATION_SIGMOID, arch);
   /*for (int i=0;i<22;i++) printf("%f ", gains[i]);printf("\n");*/
   /*printf("%f\n", *vad);*/
 }

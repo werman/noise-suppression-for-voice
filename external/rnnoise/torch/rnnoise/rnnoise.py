@@ -35,9 +35,9 @@ import os
 sys.path.append(os.path.join(os.path.split(__file__)[0], '..'))
 from sparsification import GRUSparsifier
 
-sparsify_start     = 2500
-sparsify_stop      = 8000
-sparsify_interval  = 50
+sparsify_start     = 6000
+sparsify_stop      = 20000
+sparsify_interval  = 100
 sparsify_exponent  = 3
 
 sparse_params1 = {
@@ -68,8 +68,8 @@ class RNNoise(nn.Module):
         self.gru1 = nn.GRU(self.gru_size, self.gru_size, batch_first=True)
         self.gru2 = nn.GRU(self.gru_size, self.gru_size, batch_first=True)
         self.gru3 = nn.GRU(self.gru_size, self.gru_size, batch_first=True)
-        self.dense_out = nn.Linear(self.gru_size, self.output_dim)
-        self.vad_dense = nn.Linear(self.gru_size, 1)
+        self.dense_out = nn.Linear(4*self.gru_size, self.output_dim)
+        self.vad_dense = nn.Linear(4*self.gru_size, 1)
         nb_params = sum(p.numel() for p in self.parameters())
         print(f"model: {nb_params} weights")
         self.apply(init_weights)
@@ -103,6 +103,7 @@ class RNNoise(nn.Module):
         gru1_out, gru1_state = self.gru1(tmp, gru1_state)
         gru2_out, gru2_state = self.gru2(gru1_out, gru2_state)
         gru3_out, gru3_state = self.gru3(gru2_out, gru3_state)
-        gain = torch.sigmoid(self.dense_out(gru3_out))
-        vad = torch.sigmoid(self.vad_dense(gru3_out))
+        out_cat = torch.cat([tmp, gru1_out, gru2_out, gru3_out], dim=-1)
+        gain = torch.sigmoid(self.dense_out(out_cat))
+        vad = torch.sigmoid(self.vad_dense(out_cat))
         return gain, vad, [gru1_state, gru2_state, gru3_state]

@@ -39,7 +39,7 @@ AC_DEFUN([CC_CHECK_CFLAGS_SILENT], [
   AC_CACHE_VAL(AS_TR_SH([cc_cv_cflags_$1]),
     [ac_save_CFLAGS="$CFLAGS"
      CFLAGS="$CFLAGS $1"
-     AC_LINK_IFELSE([AC_LANG_SOURCE([int main() { return 0; }])],
+     AC_LINK_IFELSE([AC_LANG_SOURCE([int main(void) { return 0; }])],
        [eval "AS_TR_SH([cc_cv_cflags_$1])='yes'"],
        [eval "AS_TR_SH([cc_cv_cflags_$1])='no'"])
      CFLAGS="$ac_save_CFLAGS"
@@ -89,7 +89,7 @@ AC_DEFUN([CC_CHECK_LDFLAGS], [
     AS_TR_SH([cc_cv_ldflags_$1]),
     [ac_save_LDFLAGS="$LDFLAGS"
      LDFLAGS="$LDFLAGS $1"
-     AC_LINK_IFELSE([AC_LANG_SOURCE([int main() { return 1; }])],
+     AC_LINK_IFELSE([AC_LANG_SOURCE([int main(void) { return 1; }])],
        [eval "AS_TR_SH([cc_cv_ldflags_$1])='yes'"],
        [eval "AS_TR_SH([cc_cv_ldflags_$1])="])
      LDFLAGS="$ac_save_LDFLAGS"
@@ -165,16 +165,16 @@ AC_DEFUN([CC_CHECK_ATTRIBUTE], [
 AC_DEFUN([CC_ATTRIBUTE_CONSTRUCTOR], [
   CC_CHECK_ATTRIBUTE(
     [constructor],,
-    [extern void foo();
-     void __attribute__((constructor)) ctor() { foo(); }],
+    [extern void foo(void);
+     void __attribute__((constructor)) ctor(void) { foo(); }],
     [$1], [$2])
 ])
 
 AC_DEFUN([CC_ATTRIBUTE_DESTRUCTOR], [
   CC_CHECK_ATTRIBUTE(
     [destructor],,
-    [extern void foo();
-     void __attribute__((destructor)) dtor() { foo(); }],
+    [extern void foo(void);
+     void __attribute__((destructor)) dtor(void) { foo(); }],
     [$1], [$2])
 ])
 
@@ -195,7 +195,7 @@ AC_DEFUN([CC_ATTRIBUTE_FORMAT_ARG], [
 AC_DEFUN([CC_ATTRIBUTE_VISIBILITY], [
   CC_CHECK_ATTRIBUTE(
     [visibility_$1], [visibility("$1")],
-    [void __attribute__((visibility("$1"))) $1_function() { }],
+    [void __attribute__((visibility("$1"))) $1_function(void) { }],
     [$2], [$3])
 ])
 
@@ -306,7 +306,7 @@ AC_DEFUN([CC_ATTRIBUTE_ALIGNED], [
      CFLAGS="$CFLAGS $cc_cv_werror"
      for cc_attribute_align_try in 64 32 16 8 4 2; do
         AC_COMPILE_IFELSE([AC_LANG_SOURCE([
-          int main() {
+          int main(void) {
             static char c __attribute__ ((aligned($cc_attribute_align_try))) = 0;
             return c;
           }])], [cc_cv_attribute_aligned=$cc_attribute_align_try; break])

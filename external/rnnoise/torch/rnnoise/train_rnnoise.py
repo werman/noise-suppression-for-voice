@@ -55,7 +55,8 @@ training_group.add_argument('--epochs', type=int, help='number of training epoch
 training_group.add_argument('--sequence-length', type=int, help='sequence length, default: 2000', default=2000)
 training_group.add_argument('--lr-decay', type=float, help='learning rate decay factor, default: 5e-5', default=5e-5)
 training_group.add_argument('--initial-checkpoint', type=str, help='initial checkpoint to start training from, default: None', default=None)
-training_group.add_argument('--gamma', type=float, help='perceptual exponent (default 0.1667)', default=0.1667)
+training_group.add_argument('--gamma', type=float, help='perceptual exponent (default 0.25)', default=0.25)
+training_group.add_argument('--sparse', action='store_true')
 
 args = parser.parse_args()
 
@@ -146,16 +147,18 @@ if __name__ == '__main__':
                 gain = gain[:,3:-1,:]
                 vad = vad[:,3:-1,:]
                 target_gain = torch.clamp(gain, min=0)
-                target_gain = target_gain*(torch.tanh(5*target_gain)**2)
+                target_gain = target_gain*(torch.tanh(8*target_gain)**2)
 
-                gain_loss = torch.mean(mask(gain)*(pred_gain**gamma - target_gain**gamma)**2)
+                e = pred_gain**gamma - target_gain**gamma
+                gain_loss = torch.mean((1+5.*vad)*mask(gain)*(e**2))
                 #vad_loss = torch.mean(torch.abs(2*vad-1)*(vad-pred_vad)**2)
                 vad_loss = torch.mean(torch.abs(2*vad-1)*(-vad*torch.log(.01+pred_vad) - (1-vad)*torch.log(1.01-pred_vad)))
-                loss = gain_loss + .0005*vad_loss
+                loss = gain_loss + .001*vad_loss
 
                 loss.backward()
                 optimizer.step()
-                model.sparsify()
+                if args.sparse:
+                    model.sparsify()
 
                 scheduler.step()
 

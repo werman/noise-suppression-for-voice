@@ -3,11 +3,12 @@
 cmd=$1
 speech=$2
 noise=$3
-output=$4
-count=$5
-split=$6
-#echo seq $split parallel -j +2 "$cmd $speech $noise $output.{} $count"
-seq $split | parallel -j +2 "$cmd $speech $noise $output.{} $count"
+fgnoise=$4
+output=$5
+count=$6
+rir=$7
+split=400
+seq $split | parallel -j +2 "$cmd -rir_list $rir $speech $noise $fgnoise $output.{} $count"
 mv $output.1 $output
 for i in $output.*
 do

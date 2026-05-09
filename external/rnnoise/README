@@ -6,7 +6,7 @@ Enhancement, Proceedings of IEEE Multimedia Signal Processing (MMSP) Workshop,
 arXiv:1709.08243, 2018.
 https://arxiv.org/pdf/1709.08243.pdf
 
-An interactive demo is available at: https://jmvalin.ca/demo/rnnoise/
+An interactive demo of version 0.1 is available at: https://jmvalin.ca/demo/rnnoise/
 
 To compile, just type:
 % ./autogen.sh
@@ -39,7 +39,7 @@ is a convenience copy.
 
 The models distributed with RNNoise are now trained using only the publicly
 available datasets listed below and using the training precedure described
-here. Exact results will still depend on the the exact mix us data used,
+here. Exact results will still depend on the the exact mix of data used,
 on how long the training is performed and on the various random seeds involved.
 
 To train an RNNoise model, you need both clean speech data, and noise data.
@@ -47,21 +47,26 @@ Both need to be sampled at 48 kHz, in 16-bit PCM format (machine endian).
 Clean speech data can be obtained from the datasets listed in the datasets.txt
 file, or by downloaded the already-concatenation of those files in
 https://media.xiph.org/rnnoise/data/tts_speech_48k.sw
-For noise data, we suggest concatenating the 48 kHz noise data from DEMAND at
-https://zenodo.org/records/1227121
-with contrib_noise.sw and synthetic_noise.sw noise files from
-https://media.xiph.org/rnnoise/data/
-To balance out the data, we recommend using multiple (e.g. 5) copies of the
-contrib_noise.sw and synthetic_noise.sw noise files.
+For noise data, we suggest the background_noise.sw and foreground_noise.sw
+(or later versions) noise files from https://media.xiph.org/rnnoise/data/
+The foreground_noise.sw file contains noise signals that are meant to be added
+to the background noise (e.g. keyboard sounds). Optionally, the foreground noise
+file can even be denoised with a traditional denoiser (e.g. libspeexdsp) to
+keep only the transient components. For background noise, the data from the
+original RNNoise noise collection have now been sufficiently filtered to
+provide good results -- either alone or in combination with the
+background_noise.sw file. The dataset can be downloaded (updated Jan 30th 2025)
+from: https://media.xiph.org/rnnoise/rnnoise_contributions.tar.gz
 
-The first step is to take the speech and noise, and mix them in a variety of ways
-to simulate real life conditions (including pauses, filtering and more).
+The first step is to take the speech and noise, and mix them in a variety of
+ways to simulate real life conditions (including pauses, filtering and more).
 Assuming the files are called speech.pcm and noise.pcm, start by generating
 the training feature data with:
 
-% ./dump_features speech.pcm noise.pcm features.f32 <count>
+% ./dump_features speech.pcm background_noise.pcm foreground_noise.pcm features.f32 <count>
 where <count> is the number of sequences to process. The number of sequences
-should be at least 10000, but the more the better (200000 or more is recommended).
+should be at least 10000, but the more the better (200000 or more is
+recommended).
 
 Optionally, training can also simulate reverberation, in which case room impulse
 responses (RIR) are also needed. Limited RIR data is available at:
@@ -70,14 +75,14 @@ The format for those is raw 32-bit floating-point (files are little endian).
 Assuming a list of all the RIR files is contained in a rir_list.txt file,
 the training feature data can be generated with:
 
-% ./dump_features -rir_list rir_list.txt speech.pcm noise.pcm features.f32 <count>
+% ./dump_features -rir_list rir_list.txt speech.pcm background_noise.pcm foreground_noise.pcm features.f32 <count>
 
 To make the feature generation faster, you can use the script provided in
 script/dump_features_parallel.sh (you will need to modify the script if you
 want to add RIR augmentation).
 
 To use it:
-% script/dump_features_parallel.sh ./dump_features speech.pcm noise.pcm features.f32 <count> <nb_processes>
+% script/dump_features_parallel.sh ./dump_features speech.pcm background_noise.pcm foreground_noise.pcm features.f32 <count> rir_list.txt
 which will run nb_processes processes, each for count sequences, and
 concatenate the output to a single file.
 

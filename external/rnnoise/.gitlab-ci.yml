@@ -1,0 +1,41 @@
+default:
+  tags:
+    - docker
+  # Image from https://hub.docker.com/_/gcc/ based on Debian
+  image: gcc:9
+
+.autoconf:
+  stage: build
+  before_script:
+    - apt-get update &&
+      apt-get install -y git ${INSTALL_COMPILER} zip ${INSTALL_EXTRA}
+  script:
+    - ./autogen.sh
+    - ./configure --enable-x86-rtcd ${CONFIG_FLAGS} || cat config.log
+    - make
+    - make ${CHECKTARGET}
+    - nm $(find . -name librnnoise.a) | awk '/ T / {print $3}' | sort
+  variables:
+    INSTALL_COMPILER: gcc g++
+    CHECKTARGET: check
+
+autoconf-gcc:
+  extends: .autoconf
+  variables:
+    CHECKTARGET: distcheck
+
+autoconf-clang:
+  extends: .autoconf
+  variables:
+    INSTALL_COMPILER: clang
+    CC: clang
+
+enable-assertions:
+  extends: .autoconf
+  variables:
+    CONFIG_FLAGS: --enable-assertions
+
+enable-dnn-debug-float:
+  extends: .autoconf
+  variables:
+    CONFIG_FLAGS: --enable-dnn-debug-float

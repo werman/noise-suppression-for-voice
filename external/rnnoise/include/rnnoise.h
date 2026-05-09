@@ -54,12 +54,12 @@ typedef struct RNNModel RNNModel;
 /**
  * Return the size of DenoiseState
  */
-RNNOISE_EXPORT int rnnoise_get_size();
+RNNOISE_EXPORT int rnnoise_get_size(void);
 
 /**
  * Return the number of samples processed by rnnoise_process_frame at a time
  */
-RNNOISE_EXPORT int rnnoise_get_frame_size();
+RNNOISE_EXPORT int rnnoise_get_frame_size(void);
 
 /**
  * Initializes a pre-allocated DenoiseState
