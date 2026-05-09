@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.6)
+cmake_minimum_required(VERSION 3.10)
 project(rnnoise_juice_plugin LANGUAGES CXX)
 
 set(PROJECT_NAME "rnnoise_juce_plugin")

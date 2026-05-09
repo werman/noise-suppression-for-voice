@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.6)
+cmake_minimum_required(VERSION 3.10)
 project("Real-time Noise Suppression Plugin" VERSION 1.99)
 
 include(GNUInstallDirs)
