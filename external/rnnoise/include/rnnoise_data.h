@@ -4,6 +4,7 @@
 
 #include "nnet.h"
 
+
 #define CONV1_OUT_SIZE 128
 
 #define CONV1_IN_SIZE 65
@@ -37,16 +38,16 @@
 #define VAD_DENSE_OUT_SIZE 1
 
 typedef struct {
-  LinearLayer conv1;
-  LinearLayer conv2;
-  LinearLayer gru1_input;
-  LinearLayer gru1_recurrent;
-  LinearLayer gru2_input;
-  LinearLayer gru2_recurrent;
-  LinearLayer gru3_input;
-  LinearLayer gru3_recurrent;
-  LinearLayer dense_out;
-  LinearLayer vad_dense;
+    LinearLayer conv1;
+    LinearLayer conv2;
+    LinearLayer gru1_input;
+    LinearLayer gru1_recurrent;
+    LinearLayer gru2_input;
+    LinearLayer gru2_recurrent;
+    LinearLayer gru3_input;
+    LinearLayer gru3_recurrent;
+    LinearLayer dense_out;
+    LinearLayer vad_dense;
 } RNNoise;
 
 int init_rnnoise(RNNoise *model, const WeightArray *arrays);
