@@ -22,7 +22,12 @@ option(BUILD_LV2_PLUGIN "If the LV2 plugin should be built" ON)
 option(BUILD_LADSPA_PLUGIN "If the LADSPA plugin should be built" ON)
 option(BUILD_AU_PLUGIN "If the AU plugin should be built (macOS only)" ON)
 option(BUILD_AUV3_PLUGIN "If the AUv3 plugin should be built (macOS only)" ON)
-option(BUILD_RTCD "Enable x86 run-time CPU detection (x86 only)" OFF)
+
+set(BUILD_RTCD_DEFAULT OFF)
+if (BUILD_FOR_RELEASE AND NOT APPLE AND CMAKE_SYSTEM_PROCESSOR MATCHES "x86|i686|AMD64|x86_64")
+    set(BUILD_RTCD_DEFAULT ON)
+endif ()
+option(BUILD_RTCD "Enable x86 run-time CPU detection (x86 only)" ${BUILD_RTCD_DEFAULT})
 
 if (BUILD_TESTS)
     list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/external/catch2/)

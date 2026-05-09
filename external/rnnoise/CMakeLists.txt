@@ -19,13 +19,6 @@ set(RN_NOISE_SRC
 if(BUILD_RTCD)
         add_compile_definitions(CPU_INFO_BY_ASM)
         add_compile_definitions(RNN_ENABLE_X86_RTCD)
-        if(MSVC)
-                set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /arch:AVX /arch:AVX2 /arch:FMA")
-                set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /arch:SSE4.1")
-        else()
-                set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mavx -mfma -mavx2")
-                set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -msse4.1")
-        endif()
         list(APPEND RN_NOISE_SRC
                 src/x86/x86cpu.c
                 src/x86/x86_dnn_map.c
@@ -35,6 +28,16 @@ if(BUILD_RTCD)
 endif()
 
 add_library(RnNoise STATIC ${RN_NOISE_SRC})
+
+if(BUILD_RTCD)
+        if(MSVC)
+                set_source_files_properties(src/x86/nnet_avx2.c PROPERTIES COMPILE_OPTIONS "/arch:AVX2")
+                set_source_files_properties(src/x86/nnet_sse4_1.c PROPERTIES COMPILE_DEFINITIONS OPUS_X86_MAY_HAVE_SSE4_1)
+        else()
+                set_source_files_properties(src/x86/nnet_avx2.c PROPERTIES COMPILE_OPTIONS "-mavx;-mfma;-mavx2")
+                set_source_files_properties(src/x86/nnet_sse4_1.c PROPERTIES COMPILE_OPTIONS "-msse4.1")
+        endif()
+endif()
 
 # Disable all warnings, since it's an external library.
 target_compile_options(RnNoise PRIVATE
