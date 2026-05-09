@@ -155,7 +155,7 @@ struct RnNoiseStereo {
 
     static constexpr info_t info =
             {
-                    9354877, // unique id
+                    9354878, // unique id
                     "noise_suppressor_stereo",
                     properties::realtime,
                     "Noise Suppressor for Voice (Stereo)",
