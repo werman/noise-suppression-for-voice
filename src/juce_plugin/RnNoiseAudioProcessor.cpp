@@ -14,7 +14,7 @@ RnNoiseAudioProcessor::RnNoiseAudioProcessor()
                                                                     "VAD Threshold",
                                                                     0.0f,
                                                                     1.0f,
-                                                                    0.6f),
+                                                                    0.85f),
                         std::make_unique<juce::AudioParameterInt>("vad_grace_period",
                                                                   "VAD Grace Period (10ms per unit)",
                                                                   0,

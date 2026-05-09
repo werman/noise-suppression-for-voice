@@ -12,7 +12,7 @@ namespace port_info_custom {
             port_types::input | port_types::control,
             {
                     port_hints::bounded_below | port_hints::bounded_above | port_hints::integer |
-                    port_hints::default_low,
+                    port_hints::default_high,
                     0.f,
                     99.f
             }

@@ -40,7 +40,8 @@ There is a minimalistic GUI with all parameters and diagnostic stats:
 ### Plugin Settings
 
 - `VAD Threshold (%)` - if probability of sound being a voice is lower than this threshold - it will be silenced.
-  In most cases the threshold between 85% - 95% would be fine.
+  Valid range is `0..100%`; the default and recommended starting point is `85%`.
+  Higher values are stricter. In most cases the threshold between 85% - 95% would be fine.
   Without the VAD some loud noises may still be a bit audible when there is no voice.
 - `VAD Grace Period (ms)` - for how long after the last voice detection the output won't be silenced. This helps when ends of words/sentences are being cut off.
 - `Retroactive VAD Grace Period (ms)` - similar to `VAD Grace Period (ms)` but for starts of words/sentences. :warning: This introduces latency!
@@ -84,7 +85,7 @@ context.modules = [
                     plugin = /path/to/librnnoise_ladspa.so
                     label = noise_suppressor_mono
                     control = {
-                        "VAD Threshold (%)" = 50.0
+                        "VAD Threshold (%)" = 85.0
                         "VAD Grace Period (ms)" = 200
                         "Retroactive VAD Grace (ms)" = 0
                         "Dry Mix" = 0
@@ -143,7 +144,7 @@ pactl list sources short
 Then, create the new device using:
 ```sh
 pacmd load-module module-null-sink sink_name=mic_denoised_out rate=48000
-pacmd load-module module-ladspa-sink sink_name=mic_raw_in sink_master=mic_denoised_out label=noise_suppressor_mono plugin=/path/to/librnnoise_ladspa.so control=50,20,0,0,0
+pacmd load-module module-ladspa-sink sink_name=mic_raw_in sink_master=mic_denoised_out label=noise_suppressor_mono plugin=/path/to/librnnoise_ladspa.so control=85,20,0,0,0
 pacmd load-module module-loopback source=<your_mic_name> sink=mic_raw_in channels=1 source_dont_move=true sink_dont_move=true
 ```
 
@@ -154,13 +155,13 @@ You can automate this by creating file in `~/.config/pulse/default.pa` with the 
 .include /etc/pulse/default.pa
 
 load-module module-null-sink sink_name=mic_denoised_out rate=48000
-load-module module-ladspa-sink sink_name=mic_raw_in sink_master=mic_denoised_out label=noise_suppressor_mono plugin=/path/to/librnnoise_ladspa.so control=50,200,0,0,0
+load-module module-ladspa-sink sink_name=mic_raw_in sink_master=mic_denoised_out label=noise_suppressor_mono plugin=/path/to/librnnoise_ladspa.so control=85,200,0,0,0
 load-module module-loopback source=your_mic_name sink=mic_raw_in channels=1 source_dont_move=true sink_dont_move=true
 
 set-default-source mic_denoised_out.monitor
 ```
 
-The order of settings in `control=50,200,0,0,0` is: `VAD Threshold (%)`, `VAD Grace Period (ms)`, `Retroactive VAD Grace Period (ms)`, `Placeholder1`, `Dry Mix`.
+The order of settings in `control=85,200,0,0,0` is: `VAD Threshold (%)`, `VAD Grace Period (ms)`, `Retroactive VAD Grace Period (ms)`, `Placeholder1`, `Dry Mix`.
 
 If you are absolutely sure that you want a stereo input use these options instead:
 
