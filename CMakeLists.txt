@@ -43,6 +43,9 @@ if (BUILD_VST_PLUGIN OR BUILD_VST3_PLUGIN OR BUILD_LV2_PLUGIN OR BUILD_AU_PLUGIN
     if (USE_SYSTEM_JUCE)
         find_package(JUCE)
     else ()
+        if(NOT JUCE_SOURCE_DIR)
+            set(JUCE_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/JUCE CACHE PATH "Path to JUCE source")
+        endif()
         # For install JUCE copies all its headers, no one needs them. It also doesn't install actual libraries.
         # On the other hand JUCE could install libraries during build process (see COPY_PLUGIN_AFTER_BUILD option).
         # So we have to manually install plugins.
