@@ -50,13 +50,13 @@ There is a minimalistic GUI with all parameters and diagnostic stats:
 
 ### Windows + Equalizer APO (VST2)
 
-To check or change mic settings go to "Recording devices" -> "Recording" -> "Properties" of the target mic -> "Advanced".
+Download Equalizer APO from [equalizerapo.com](https://equalizerapo.com/) or the [SourceForge project](https://sourceforge.net/projects/equalizerapo/).
 
-To enable the plugin in Equalizer APO select "Plugins" -> "VST Plugin" and specify the plugin dll.
+Install Equalizer APO and configure it for the microphone device you want to process. During setup, select the target microphone in the Equalizer APO Configurator and reboot if the installer asks for it. You can check or change microphone settings in Windows through "Recording devices" -> "Recording" -> "Properties" of the target mic -> "Advanced".
 
-See [detailed guide](https://medium.com/@bssankaran/free-and-open-source-software-noise-cancelling-for-working-from-home-edb1b4e9764e) provided by  [@bssankaran](https://github.com/bssankaran).
+After reboot, open Equalizer APO Configuration Editor. To enable the plugin select "Plugins" -> "VST Plugin", choose the RNNoise VST DLL, and adjust VAD threshold, grace periods, and mix in the plugin GUI.
 
-- v1.0: Now there is a GUI, so it became easy to change parameters. 
+See [detailed guide](https://medium.com/@bssankaran/free-and-open-source-software-noise-cancelling-for-working-from-home-edb1b4e9764e) provided by [@bssankaran](https://github.com/bssankaran).
 
 ### Linux
 
