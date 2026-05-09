@@ -156,11 +156,13 @@ RnNoiseCommonPlugin::process(const float *const *in, float **out, size_t sampleF
 
         if (maxVadProbability >= vadThreshold) {
             m_lastOutputIdxOverVADThreshold = getCurOut(m_channels[0])->idx;
+            m_hasLastOutputIdxOverVADThreshold = true;
         } else {
             /* Calculate grace period */
             for (auto &channel: m_channels) {
                 auto curOut = getCurOut(channel);
-                bool inVadPeriod = (curOut->idx - m_lastOutputIdxOverVADThreshold) <= vadGracePeriodBlocks;
+                bool inVadPeriod = m_hasLastOutputIdxOverVADThreshold
+                                   && (curOut->idx - m_lastOutputIdxOverVADThreshold) <= vadGracePeriodBlocks;
                 if (inVadPeriod) {
                     assert(curOut->muteState == ChunkUnmuteState::UNMUTED_BY_DEFAULT);
                     curOut->muteState = ChunkUnmuteState::UNMUTED_VAD;
@@ -177,6 +179,7 @@ RnNoiseCommonPlugin::process(const float *const *in, float **out, size_t sampleF
     if (retroactiveVADGraceBlocks > 0) {
         for (auto &channel: m_channels) {
             uint64_t lastBlockIdxOverVADThreshold = 0;
+            bool hasLastBlockIdxOverVADThreshold = false;
             for (uint32_t blockIdx = 0; blockIdx < (blocksFromRnnoise + retroactiveVADGraceBlocks); blockIdx++) {
                 if (blockIdx >= channel.rnnoiseOutput.size()) {
                     break;
@@ -185,8 +188,10 @@ RnNoiseCommonPlugin::process(const float *const *in, float **out, size_t sampleF
                 auto &outBlock = channel.rnnoiseOutput.rbegin()[blockIdx];
                 if (outBlock->maxVadProbability >= vadThreshold) {
                     lastBlockIdxOverVADThreshold = outBlock->idx;
+                    hasLastBlockIdxOverVADThreshold = true;
                 } else if (outBlock->muteState == ChunkUnmuteState::MUTED) {
-                    bool inVadPeriod = (lastBlockIdxOverVADThreshold - outBlock->idx) <= retroactiveVADGraceBlocks;
+                    bool inVadPeriod = hasLastBlockIdxOverVADThreshold
+                                       && (lastBlockIdxOverVADThreshold - outBlock->idx) <= retroactiveVADGraceBlocks;
                     if (inVadPeriod) {
                         outBlock->muteState = ChunkUnmuteState::UNMUTED_RETRO_VAD;
                         if (channel.idx == 0) {
@@ -305,6 +310,7 @@ RnNoiseCommonPlugin::process(const float *const *in, float **out, size_t sampleF
 
 void RnNoiseCommonPlugin::createDenoiseState() {
     m_newOutputIdx = 0;
+    m_hasLastOutputIdxOverVADThreshold = false;
     m_lastOutputIdxOverVADThreshold = 0;
     m_currentOutputIdxToOutput = 0;
     m_prevRetroactiveVADGraceBlocks = 0;
@@ -320,6 +326,7 @@ void RnNoiseCommonPlugin::createDenoiseState() {
 
 void RnNoiseCommonPlugin::resetBufferedOutput() {
     m_newOutputIdx = 0;
+    m_hasLastOutputIdxOverVADThreshold = false;
     m_lastOutputIdxOverVADThreshold = 0;
     m_currentOutputIdxToOutput = 0;
     m_prevRetroactiveVADGraceBlocks = 0;

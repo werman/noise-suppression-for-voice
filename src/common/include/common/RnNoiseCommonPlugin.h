@@ -63,6 +63,7 @@ private:
     uint32_t m_channelCount;
 
     uint64_t m_newOutputIdx = 0;
+    bool m_hasLastOutputIdxOverVADThreshold = false;
     uint64_t m_lastOutputIdxOverVADThreshold = 0;
 
     uint64_t m_currentOutputIdxToOutput = 0;
@@ -101,4 +102,3 @@ private:
 
     std::atomic<RnNoiseStats> m_stats;
 };
-

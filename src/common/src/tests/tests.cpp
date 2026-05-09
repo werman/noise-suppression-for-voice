@@ -3,6 +3,25 @@
 
 #include "common/RnNoiseCommonPlugin.h"
 
+namespace {
+
+constexpr size_t kDenoiseBlockSize = 480;
+
+struct MonoBuffers {
+    explicit MonoBuffers(size_t sampleFrames) :
+            input(sampleFrames, 0.f),
+            output(sampleFrames, 0.f),
+            inputs{input.data()},
+            outputs{output.data()} {}
+
+    std::vector<float> input;
+    std::vector<float> output;
+    const float *inputs[1];
+    float *outputs[1];
+};
+
+} // namespace
+
 TEST_CASE("Init -> Deinit cycle", "[common_plugin]") {
     auto channels = GENERATE(1, 2, 4);
 
@@ -20,6 +39,50 @@ TEST_CASE("Init -> Deinit cycle", "[common_plugin]") {
         plugin.init();
         plugin.init();
     }
+}
+
+TEST_CASE("VAD grace starts only after a voiced block", "[common_plugin]") {
+    MonoBuffers buffers(kDenoiseBlockSize);
+
+    RnNoiseCommonPlugin plugin(1);
+    plugin.init();
+
+    for (int i = 0; i < 3; i++) {
+        plugin.process(buffers.inputs, buffers.outputs, kDenoiseBlockSize, 1.f, 20, 0);
+    }
+
+    REQUIRE(plugin.getStats().vadGraceBlocks == 0);
+
+    plugin.process(buffers.inputs, buffers.outputs, kDenoiseBlockSize, 0.f, 20, 0);
+    plugin.resetStats();
+    plugin.process(buffers.inputs, buffers.outputs, kDenoiseBlockSize, 1.f, 20, 0);
+
+    REQUIRE(plugin.getStats().vadGraceBlocks == 1);
+}
+
+TEST_CASE("VAD grace absent state is restored when buffered output resets", "[common_plugin]") {
+    MonoBuffers buffers(kDenoiseBlockSize);
+
+    RnNoiseCommonPlugin plugin(1);
+    plugin.init();
+
+    plugin.process(buffers.inputs, buffers.outputs, kDenoiseBlockSize, 0.f, 20, 0);
+    plugin.process(buffers.inputs, buffers.outputs, kDenoiseBlockSize, 1.f, 20, 0, 1.f);
+    plugin.resetStats();
+    plugin.process(buffers.inputs, buffers.outputs, kDenoiseBlockSize, 1.f, 20, 0);
+
+    REQUIRE(plugin.getStats().vadGraceBlocks == 0);
+}
+
+TEST_CASE("Retroactive VAD grace starts only after a voiced block", "[common_plugin]") {
+    MonoBuffers buffers(kDenoiseBlockSize);
+
+    RnNoiseCommonPlugin plugin(1);
+    plugin.init();
+
+    plugin.process(buffers.inputs, buffers.outputs, kDenoiseBlockSize, 1.f, 20, 3);
+
+    REQUIRE(plugin.getStats().retroactiveVADGraceBlocks == 0);
 }
 
 TEST_CASE("All options", "[common_plugin]") {
