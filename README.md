@@ -219,6 +219,38 @@ The plugin is tested with:
 
 I'm not associated with the original RNNoise work and do NOT have any understanding of recurrent neural networks it is based upon.
 
+## Audio evaluation tool
+
+<details>
+<summary>Dataset setup and usage</summary>
+
+An optional `rnnoise_audio_eval` executable can run the common processor against paired clean/noisy speech samples and save processed WAVs for manual listening.
+
+Download the small Edinburgh test archives into a local data directory, for example `test-data/`:
+
+- `clean_testset_wav.zip` from the [Edinburgh noisy speech database](https://datashare.ed.ac.uk/handle/10283/2791)
+- `noisyreverb_testset_wav.zip` from the [Edinburgh noisy reverberant speech database](https://datashare.ed.ac.uk/handle/10283/2826)
+
+Build the tool:
+
+```sh
+cmake -S . -B build-audio-eval -DBUILD_AUDIO_EVAL_TOOL=ON
+cmake --build build-audio-eval --target rnnoise_audio_eval -j 8
+```
+
+Run the evaluation:
+
+```sh
+./build-audio-eval/src/common/rnnoise_audio_eval \
+  --data-dir test-data \
+  --output-dir build-audio-eval/audio-eval/processed \
+  --jobs 8
+```
+
+The tool accepts either the ZIP files above or already extracted `clean_testset_wav/` and `noisyreverb_testset_wav/` directories. It prints SNR lift, quiet-region attenuation, chunk-size consistency, and retroactive VAD stats. Representative clean/noisy/processed WAVs are written to `--output-dir`; pass `--write-all` to save every processed clip.
+
+</details>
+
 ## Contributing
 
 External dependencies are vendored via [git-subrepo](https://github.com/ingydotnet/git-subrepo). So that there is no need to use submodules, and patching subrepos is easy (at the moment we have several patches for JUCE).

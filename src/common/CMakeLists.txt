@@ -24,6 +24,13 @@ target_include_directories(RnNoisePluginCommon PUBLIC
         $<INSTALL_INTERFACE:include>
         PRIVATE src)
 
+if (BUILD_AUDIO_EVAL_TOOL)
+    find_package(Threads REQUIRED)
+    add_executable(rnnoise_audio_eval
+            src/tools/audio_eval.cpp)
+    target_link_libraries(rnnoise_audio_eval PRIVATE RnNoisePluginCommon Threads::Threads)
+endif ()
+
 if (BUILD_TESTS)
     set(TESTS_SRC
             src/tests/tests.cpp
