@@ -44,6 +44,8 @@ There is a minimalistic GUI with all parameters and diagnostic stats:
   Without the VAD some loud noises may still be a bit audible when there is no voice.
 - `VAD Grace Period (ms)` - for how long after the last voice detection the output won't be silenced. This helps when ends of words/sentences are being cut off.
 - `Retroactive VAD Grace Period (ms)` - similar to `VAD Grace Period (ms)` but for starts of words/sentences. :warning: This introduces latency!
+- `Mix` - dry/wet blend for VST/VST3/LV2/AU/AUv3. `0` is dry input only, `1` is fully processed output.
+- `Dry Mix` - LADSPA-only, how much of dry input is mixed in. To keep backwards config compatibility - `0` is wet, `1` is dry.
 
 ### Windows + Equalizer APO (VST2)
 
@@ -85,6 +87,7 @@ context.modules = [
                         "VAD Threshold (%)" = 50.0
                         "VAD Grace Period (ms)" = 200
                         "Retroactive VAD Grace (ms)" = 0
+                        "Dry Mix" = 0
                     }
                 }
             ]
@@ -106,7 +109,7 @@ context.modules = [
 
 - Change `/path/to/librnnoise_ladspa.so` to actual library path
 - If you are **absolutely** sure that you need stereo output - change `noise_suppressor_mono` -> `noise_suppressor_stereo`. Even if your mic says that it is stereo - you probably don't need stereo output. It also would consume 2x resources.
-- Configure plugin parameters: `VAD Threshold (%)`, ...
+- Configure plugin parameters: `VAD Threshold (%)`, `VAD Grace Period (ms)`, `Retroactive VAD Grace (ms)`, and optionally `Dry Mix`.
 - Restart PipeWire: `systemctl restart --user pipewire.service`
 - Now you should be able to select `Noise Canceling source` as input device
 
@@ -157,7 +160,7 @@ load-module module-loopback source=your_mic_name sink=mic_raw_in channels=1 sour
 set-default-source mic_denoised_out.monitor
 ```
 
-The order of settings in `control=50,200,0,0,0` is: `VAD Threshold (%)`, `VAD Grace Period (ms)`, `Retroactive VAD Grace Period (ms)`, `Placeholder1`, `Placeholder2`.
+The order of settings in `control=50,200,0,0,0` is: `VAD Threshold (%)`, `VAD Grace Period (ms)`, `Retroactive VAD Grace Period (ms)`, `Placeholder1`, `Dry Mix`.
 
 If you are absolutely sure that you want a stereo input use these options instead:
 

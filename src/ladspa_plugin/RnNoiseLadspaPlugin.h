@@ -45,6 +45,16 @@ namespace port_info_custom {
             port_types::input | port_types::control,
             {0, 0.f, 0.f}
     };
+    constexpr static port_info_t dry_mix_input = {
+            "Dry Mix",
+            "How much unprocessed input is mixed back in. 0 keeps the legacy fully processed output, 1 is dry only.",
+            port_types::input | port_types::control,
+            {
+                    port_hints::bounded_below | port_hints::bounded_above | port_hints::default_0,
+                    0.f,
+                    1.f
+            }
+    };
 }
 
 struct RnNoiseMono {
@@ -67,7 +77,7 @@ struct RnNoiseMono {
                     port_info_custom::vad_grace_period_blocks_input,
                     port_info_custom::retroactive_vad_grace_blocks_input,
                     port_info_custom::placeholder_input,
-                    port_info_custom::placeholder_input,
+                    port_info_custom::dry_mix_input,
                     port_info_common::final_port
             };
 
@@ -101,6 +111,7 @@ struct RnNoiseMono {
         uint32_t vad_threshold = ports.get<port_names::in_vad_threshold>();
         uint32_t vad_grace_period_blocks = ports.get<port_names::in_vad_grace_period_blocks>() / ms_in_block;
         uint32_t retroactive_vad_grace_blocks = ports.get<port_names::in_retroactive_vad_grace_blocks>() / ms_in_block;
+        float dry_mix = std::max(std::min(static_cast<float>(ports.get<port_names::in_placeholder2>()), 1.f), 0.f);
 
         float vad_threshold_normalized = std::max(std::min(vad_threshold / 100.f, 0.99f), 0.f);
 
@@ -108,7 +119,7 @@ struct RnNoiseMono {
         float *output[] = {out_buffer.data()};
 
         m_rnNoisePlugin->process(input, output, in_buffer.size(), vad_threshold_normalized,
-                                 vad_grace_period_blocks, retroactive_vad_grace_blocks);
+                                 vad_grace_period_blocks, retroactive_vad_grace_blocks, dry_mix);
     }
 
     std::unique_ptr<RnNoiseCommonPlugin> m_rnNoisePlugin;
@@ -138,7 +149,7 @@ struct RnNoiseStereo {
                     port_info_custom::vad_grace_period_blocks_input,
                     port_info_custom::retroactive_vad_grace_blocks_input,
                     port_info_custom::placeholder_input,
-                    port_info_custom::placeholder_input,
+                    port_info_custom::dry_mix_input,
                     port_info_common::final_port
             };
 
@@ -176,6 +187,7 @@ struct RnNoiseStereo {
         uint32_t vad_threshold = ports.get<port_names::in_vad_threshold>();
         uint32_t vad_grace_period_blocks = ports.get<port_names::in_vad_grace_period_blocks>() / ms_in_block;
         uint32_t retroactive_vad_grace_blocks = ports.get<port_names::in_retroactive_vad_grace_blocks>() / ms_in_block;
+        float dry_mix = std::max(std::min(static_cast<float>(ports.get<port_names::in_placeholder2>()), 1.f), 0.f);
 
         float vad_threshold_normalized = std::max(std::min(vad_threshold / 100.f, 0.99f), 0.f);
 
@@ -183,7 +195,7 @@ struct RnNoiseStereo {
         float *output[] = {out_buffer_l.data(), out_buffer_r.data()};
 
         m_rnNoisePlugin->process(input, output, in_buffer_l.size(), vad_threshold_normalized,
-                                 vad_grace_period_blocks, retroactive_vad_grace_blocks);
+                                 vad_grace_period_blocks, retroactive_vad_grace_blocks, dry_mix);
     }
 
     std::unique_ptr<RnNoiseCommonPlugin> m_rnNoisePlugin;

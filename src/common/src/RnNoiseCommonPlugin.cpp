@@ -22,14 +22,28 @@ void RnNoiseCommonPlugin::deinit() {
 
 void
 RnNoiseCommonPlugin::process(const float *const *in, float **out, size_t sampleFrames, float vadThreshold,
-                             uint32_t vadGracePeriodBlocks, uint32_t retroactiveVADGraceBlocks) {
+                             uint32_t vadGracePeriodBlocks, uint32_t retroactiveVADGraceBlocks, float dryMix) {
     /* TODO: Option to output noise when channel is muted;
      * TODO: Remove blocks in output queue when retroactiveVADGraceBlocks is reduced;
      */
 
     assert(vadThreshold >= 0.f && vadThreshold <= 1.f);
+    assert(dryMix >= 0.f && dryMix <= 1.f);
 
     if (sampleFrames == 0) {
+        return;
+    }
+
+    dryMix = std::max(std::min(dryMix, 1.f), 0.f);
+    if (dryMix == 1.f) {
+        for (uint32_t channelIdx = 0; channelIdx < m_channelCount; channelIdx++) {
+            std::copy(in[channelIdx], in[channelIdx] + sampleFrames, out[channelIdx]);
+        }
+
+        resetBufferedOutput();
+        RnNoiseStats stats = m_stats.load();
+        stats.blocksWaitingForOutput = 0;
+        m_stats.store(stats);
         return;
     }
 
@@ -56,6 +70,7 @@ RnNoiseCommonPlugin::process(const float *const *in, float **out, size_t sampleF
 
     vadGracePeriodBlocks = std::max(vadGracePeriodBlocks, k_minVADGracePeriodBlocks);
     retroactiveVADGraceBlocks = std::min(retroactiveVADGraceBlocks, k_maxRetroactiveVADGraceBlocks);
+    const bool shouldMixDry = dryMix > 0.f;
 
     /* Copy input data (since we are not allowed to change it inplace) */
     for (auto &channel: m_channels) {
@@ -64,6 +79,15 @@ RnNoiseCommonPlugin::process(const float *const *in, float **out, size_t sampleF
         float *inMultiplied = &channel.rnnoiseInput[newSamplesStart];
         for (size_t i = 0; i < sampleFrames; i++) {
             inMultiplied[i] = inMultiplied[i] * std::numeric_limits<short>::max();
+        }
+
+        if (shouldMixDry) {
+            if (channel.dryInput.size() < newSamplesStart) {
+                channel.dryInput.resize(newSamplesStart, 0.f);
+            }
+            channel.dryInput.insert(channel.dryInput.end(), in[channel.idx], in[channel.idx] + sampleFrames);
+        } else {
+            channel.dryInput.clear();
         }
     }
 
@@ -91,6 +115,11 @@ RnNoiseCommonPlugin::process(const float *const *in, float **out, size_t sampleF
             outBlock->vadProbability = rnnoise_process_frame(channel.denoiseState.get(),
                                                              outBlock->frames,
                                                              currentIn);
+            if (shouldMixDry) {
+                std::copy(channel.dryInput.begin() + blockIdx * k_denoiseBlockSize,
+                          channel.dryInput.begin() + (blockIdx + 1) * k_denoiseBlockSize,
+                          outBlock->dryFrames);
+            }
 
             channel.rnnoiseOutput.push_back(std::move(outBlock));
         }
@@ -99,6 +128,10 @@ RnNoiseCommonPlugin::process(const float *const *in, float **out, size_t sampleF
             /* Erasing is cheap since it just copies the elements that are left to the beginning of the vector. */
             channel.rnnoiseInput.erase(channel.rnnoiseInput.begin(),
                                        channel.rnnoiseInput.begin() + blocksFromRnnoise * k_denoiseBlockSize);
+            if (shouldMixDry) {
+                channel.dryInput.erase(channel.dryInput.begin(),
+                                       channel.dryInput.begin() + blocksFromRnnoise * k_denoiseBlockSize);
+            }
         }
     }
 
@@ -209,7 +242,17 @@ RnNoiseCommonPlugin::process(const float *const *in, float **out, size_t sampleF
         while (curOutFrameIdx < sampleFrames && blockIdxRelative >= 0) {
             auto &outBlock = channel.rnnoiseOutput.rbegin()[blockIdxRelative];
             size_t copyFromThisBlock = std::min(k_denoiseBlockSize - outBlock->curOffset, toOutputFrames);
-            if (outBlock->muteState == ChunkUnmuteState::MUTED) {
+            if (shouldMixDry) {
+                const float wetMix = 1.f - dryMix;
+                for (size_t frameIdx = 0; frameIdx < copyFromThisBlock; frameIdx++) {
+                    float wetFrame = 0.f;
+                    if (outBlock->muteState != ChunkUnmuteState::MUTED) {
+                        wetFrame = outBlock->frames[outBlock->curOffset + frameIdx];
+                    }
+                    out[channel.idx][curOutFrameIdx + frameIdx] =
+                            wetFrame * wetMix + outBlock->dryFrames[outBlock->curOffset + frameIdx] * dryMix;
+                }
+            } else if (outBlock->muteState == ChunkUnmuteState::MUTED) {
                 // TODO: Maybe we should output some noise instead? Make it an option?
                 std::fill(out[channel.idx] + curOutFrameIdx, out[channel.idx] + curOutFrameIdx + copyFromThisBlock, 0.f);
             } else {
@@ -271,7 +314,23 @@ void RnNoiseCommonPlugin::createDenoiseState() {
             rnnoise_destroy(st);
         });
 
-        m_channels.push_back(ChannelData{i, denoiseState, {}, {}, {}});
+        m_channels.push_back(ChannelData{i, denoiseState, {}, {}, {}, {}});
+    }
+}
+
+void RnNoiseCommonPlugin::resetBufferedOutput() {
+    m_newOutputIdx = 0;
+    m_lastOutputIdxOverVADThreshold = 0;
+    m_currentOutputIdxToOutput = 0;
+    m_prevRetroactiveVADGraceBlocks = 0;
+
+    for (auto &channel: m_channels) {
+        channel.rnnoiseInput.clear();
+        channel.dryInput.clear();
+        channel.outputBlocksCache.insert(channel.outputBlocksCache.end(),
+                                         std::make_move_iterator(channel.rnnoiseOutput.begin()),
+                                         std::make_move_iterator(channel.rnnoiseOutput.end()));
+        channel.rnnoiseOutput.clear();
     }
 }
 
@@ -282,4 +341,3 @@ void RnNoiseCommonPlugin::resetStats() {
 const RnNoiseStats RnNoiseCommonPlugin::getStats() const {
     return m_stats.load();
 }
-

@@ -18,6 +18,7 @@ RnNoiseAudioProcessorEditor::RnNoiseAudioProcessorEditor(RnNoiseAudioProcessor &
     auto vadThresholdParam = m_processorRef.m_parameters.getParameter("vad_threshold");
     auto vadGracePeriodParam = m_processorRef.m_parameters.getParameter("vad_grace_period");
     auto vadRetroactiveGracePeriodParam = m_processorRef.m_parameters.getParameter("vad_retroactive_grace_period");
+    auto mixParam = m_processorRef.m_parameters.getParameter("mix");
 
     m_vadThresholdLabel.setText(vadThresholdParam->getName(99), juce::dontSendNotification);
     addAndMakeVisible(m_vadThresholdLabel);
@@ -41,6 +42,13 @@ RnNoiseAudioProcessorEditor::RnNoiseAudioProcessorEditor(RnNoiseAudioProcessor &
                                                                                vadRetroactiveGracePeriodParam->getParameterID(),
                                                                                m_vadRetroactiveGracePeriodSlider);
 
+    m_mixLabel.setText(mixParam->getName(99), juce::dontSendNotification);
+    addAndMakeVisible(m_mixLabel);
+    addAndMakeVisible(m_mixSlider);
+    m_mixAttachment = std::make_unique<SliderAttachment>(m_valueTreeState,
+                                                         mixParam->getParameterID(),
+                                                         m_mixSlider);
+
     addAndMakeVisible(m_statsHeaderLabel);
     m_statsHeaderLabel.setText("Debug Statistics (updated once per second)", juce::dontSendNotification);
     m_statsHeaderLabel.setFont(juce::Font(20.0f, juce::Font::bold));
@@ -51,7 +59,7 @@ RnNoiseAudioProcessorEditor::RnNoiseAudioProcessorEditor(RnNoiseAudioProcessor &
     addAndMakeVisible(m_statsBlocksWaitingForOutputLabel);
     addAndMakeVisible(m_statsOutputFramesForcedToBeZeroedLabel);
 
-    setSize(400, 400);
+    setSize(400, 440);
 }
 
 void RnNoiseAudioProcessorEditor::paint(juce::Graphics &g) {
@@ -77,6 +85,8 @@ void RnNoiseAudioProcessorEditor::resized() {
             juce::FlexItem(m_vadRetroactiveGracePeriodLabel).withWidth(width).withFlex(1.0));
     flexBox.items.add(
             juce::FlexItem(m_vadRetroactiveGracePeriodSlider).withWidth(width).withFlex(1.0));
+    flexBox.items.add(juce::FlexItem(m_mixLabel).withWidth(width).withFlex(1.0));
+    flexBox.items.add(juce::FlexItem(m_mixSlider).withWidth(width).withFlex(1.0));
 
     flexBox.items.add(
             juce::FlexItem(m_statsHeaderLabel).withWidth(width).withFlex(1.0));

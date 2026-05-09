@@ -51,6 +51,7 @@ public:
     juce::AudioParameterFloat* m_vadThresholdParam;
     juce::AudioParameterInt* m_vadGracePeriodParam;
     juce::AudioParameterInt* m_vadRetroactiveGracePeriodParam;
+    juce::AudioParameterFloat* m_mixParam;
 
     std::shared_ptr<RnNoiseCommonPlugin> m_rnNoisePlugin;
 

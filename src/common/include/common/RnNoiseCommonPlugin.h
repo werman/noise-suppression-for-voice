@@ -42,9 +42,11 @@ public:
      * was detected last time.
      * @param retroactiveVADGraceBlocks If voice is detected in current block, how many blocks
      * in the past will not be silenced. Introduces the delay of retroactiveVADGraceBlocks blocks.
+     * @param dryMix How much unprocessed input is mixed back in. 0 means fully processed,
+     * 1 means dry input only.
      */
     void process(const float *const *in, float **out, size_t sampleFrames, float vadThreshold,
-                 uint32_t vadGracePeriodBlocks, uint32_t retroactiveVADGraceBlocks);
+                 uint32_t vadGracePeriodBlocks, uint32_t retroactiveVADGraceBlocks, float dryMix = 0.f);
 
     void resetStats();
     const RnNoiseStats getStats() const;
@@ -52,6 +54,7 @@ public:
 private:
 
     void createDenoiseState();
+    void resetBufferedOutput();
 
 private:
     static const size_t k_denoiseBlockSize = 480;
@@ -79,6 +82,7 @@ private:
         float maxVadProbability;
         ChunkUnmuteState muteState;
         float frames[480];
+        float dryFrames[480];
         size_t curOffset;
     };
 
@@ -88,6 +92,7 @@ private:
         std::shared_ptr<DenoiseState> denoiseState;
 
         std::vector<float> rnnoiseInput;
+        std::vector<float> dryInput;
         std::vector<std::unique_ptr<OutputChunk>> rnnoiseOutput;
 
         std::vector<std::unique_ptr<OutputChunk>> outputBlocksCache;
@@ -96,6 +101,4 @@ private:
 
     std::atomic<RnNoiseStats> m_stats;
 };
-
-
 

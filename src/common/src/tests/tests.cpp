@@ -108,3 +108,135 @@ TEST_CASE("Change Retroactive VAD", "[common_plugin]") {
     const RnNoiseStats stats = plugin.getStats();
     REQUIRE(stats.blocksWaitingForOutput <= endRetroactiveVADGraceBlocks + 1);
 }
+
+TEST_CASE("Dry mix blends processed output with input", "[common_plugin]") {
+    constexpr auto channels = 2;
+    constexpr auto sampleFrames = 480;
+    constexpr auto dryMix = 0.25f;
+
+    std::vector<std::vector<float>> inputData(channels);
+    std::vector<const float *> inputs;
+    std::vector<std::vector<float>> wetOutputData(channels);
+    std::vector<std::vector<float>> mixedOutputData(channels);
+    std::vector<std::vector<float>> dryOutputData(channels);
+    std::vector<float *> wetOutputs;
+    std::vector<float *> mixedOutputs;
+    std::vector<float *> dryOutputs;
+
+    for (int ch = 0; ch < channels; ch++) {
+        inputData[ch].resize(sampleFrames);
+        wetOutputData[ch].resize(sampleFrames);
+        mixedOutputData[ch].resize(sampleFrames);
+        dryOutputData[ch].resize(sampleFrames);
+
+        for (int frame = 0; frame < sampleFrames; frame++) {
+            inputData[ch][frame] = 0.1f * static_cast<float>((frame % 17) - 8) / 8.f;
+        }
+
+        inputs.push_back(inputData[ch].data());
+        wetOutputs.push_back(wetOutputData[ch].data());
+        mixedOutputs.push_back(mixedOutputData[ch].data());
+        dryOutputs.push_back(dryOutputData[ch].data());
+    }
+
+    RnNoiseCommonPlugin wetPlugin(channels);
+    RnNoiseCommonPlugin mixedPlugin(channels);
+    RnNoiseCommonPlugin dryPlugin(channels);
+    wetPlugin.init();
+    mixedPlugin.init();
+    dryPlugin.init();
+
+    wetPlugin.process(inputs.data(), wetOutputs.data(), sampleFrames, 0.f, 20, 0, 0.f);
+    mixedPlugin.process(inputs.data(), mixedOutputs.data(), sampleFrames, 0.f, 20, 0, dryMix);
+    dryPlugin.process(inputs.data(), dryOutputs.data(), sampleFrames, 0.f, 20, 0, 1.f);
+
+    for (int ch = 0; ch < channels; ch++) {
+        for (int frame = 0; frame < sampleFrames; frame++) {
+            CAPTURE(ch, frame);
+
+            REQUIRE(dryOutputData[ch][frame] == Approx(inputData[ch][frame]));
+
+            const float expectedMixedOutput =
+                    wetOutputData[ch][frame] * (1.f - dryMix) + inputData[ch][frame] * dryMix;
+            REQUIRE(mixedOutputData[ch][frame] == Approx(expectedMixedOutput));
+        }
+    }
+}
+
+TEST_CASE("Dry-only mix bypasses RNNoise buffering for partial blocks", "[common_plugin]") {
+    constexpr auto channels = 2;
+    constexpr auto sampleFrames = 200;
+    constexpr auto dryMix = 1.f;
+
+    std::vector<std::vector<float>> inputData(channels);
+    std::vector<std::vector<float>> outputData(channels);
+    std::vector<const float *> inputs;
+    std::vector<float *> outputs;
+
+    for (int ch = 0; ch < channels; ch++) {
+        inputData[ch].resize(sampleFrames);
+        outputData[ch].resize(sampleFrames, -1.f);
+
+        for (int frame = 0; frame < sampleFrames; frame++) {
+            inputData[ch][frame] = 0.001f * static_cast<float>((ch + 1) * (frame + 1));
+        }
+
+        inputs.push_back(inputData[ch].data());
+        outputs.push_back(outputData[ch].data());
+    }
+
+    RnNoiseCommonPlugin plugin(channels);
+    plugin.init();
+
+    plugin.process(inputs.data(), outputs.data(), sampleFrames, 0.f, 20, 0, dryMix);
+
+    for (int ch = 0; ch < channels; ch++) {
+        for (int frame = 0; frame < sampleFrames; frame++) {
+            CAPTURE(ch, frame);
+            REQUIRE(outputData[ch][frame] == Approx(inputData[ch][frame]));
+        }
+    }
+}
+
+TEST_CASE("Dry mix uses the same delayed timeline as wet output", "[common_plugin]") {
+    constexpr auto channels = 1;
+    constexpr auto sampleFrames = 200;
+    constexpr auto calls = 6;
+    constexpr auto dryMix = 0.25f;
+    constexpr auto wetMix = 1.f - dryMix;
+
+    std::vector<float> inputData(sampleFrames * calls);
+    std::vector<float> wetOutputData(sampleFrames);
+    std::vector<float> mixedOutputData(sampleFrames);
+
+    for (int frame = 0; frame < sampleFrames * calls; frame++) {
+        inputData[frame] = 0.0001f * static_cast<float>(frame + 1);
+    }
+
+    RnNoiseCommonPlugin wetPlugin(channels);
+    RnNoiseCommonPlugin mixedPlugin(channels);
+    wetPlugin.init();
+    mixedPlugin.init();
+
+    for (int call = 0; call < calls; call++) {
+        const float *inputs[] = {inputData.data() + sampleFrames * call};
+        float *wetOutputs[] = {wetOutputData.data()};
+        float *mixedOutputs[] = {mixedOutputData.data()};
+
+        wetPlugin.process(inputs, wetOutputs, sampleFrames, 0.f, 20, 0, 0.f);
+        mixedPlugin.process(inputs, mixedOutputs, sampleFrames, 0.f, 20, 0, dryMix);
+
+        for (int frame = 0; frame < sampleFrames; frame++) {
+            CAPTURE(call, frame);
+
+            float expectedDryOutput = 0.f;
+            if (call >= 2) {
+                expectedDryOutput = inputData[sampleFrames * (call - 2) + frame];
+            }
+
+            const float expectedMixedOutput =
+                    wetOutputData[frame] * wetMix + expectedDryOutput * dryMix;
+            REQUIRE(mixedOutputData[frame] == Approx(expectedMixedOutput));
+        }
+    }
+}
