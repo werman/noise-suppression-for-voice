@@ -189,9 +189,25 @@ Further reading:
 
 </details>
 
-### MacOS
+### macOS
 
-TODO, contributions are welcomed!
+The macOS release archive contains the plug-in bundles under `bin`. For most hosts, install one of these:
+
+- `rnnoise.vst3` - VST3 plug-in. Copy it to `~/Library/Audio/Plug-Ins/VST3/` for your user, or `/Library/Audio/Plug-Ins/VST3/` for all users.
+- `rnnoise.component` - Audio Unit plug-in. Copy it to `~/Library/Audio/Plug-Ins/Components/` for your user, or `/Library/Audio/Plug-Ins/Components/` for all users.
+- `rnnoise_mono.vst` and `rnnoise_stereo.vst` - VST2 plug-ins. Copy them to `~/Library/Audio/Plug-Ins/VST/` for your user, or `/Library/Audio/Plug-Ins/VST/` for all users.
+
+Create the destination directory if it does not exist, then restart the host application or rescan plug-ins in the host's plug-in manager.
+
+Use the format your host supports. Logic Pro, GarageBand, and MainStage use Audio Units. REAPER and many other DAWs can use VST3, VST2, and/or Audio Units.
+
+If macOS blocks a downloaded plug-in, first try opening the host once and approving the plug-in in System Settings -> Privacy & Security. If that is not enough and you trust the downloaded archive, remove the quarantine attribute from the copied bundle:
+
+```sh
+xattr -dr com.apple.quarantine ~/Library/Audio/Plug-Ins/VST3/rnnoise.vst3
+```
+
+If you build from source on macOS, the release workflow builds universal `x86_64`/`arm64` plug-ins. A local build on Apple Silicon or Intel will use the architecture selected by CMake unless you set `CMAKE_OSX_ARCHITECTURES`.
 
 ## Status
 
