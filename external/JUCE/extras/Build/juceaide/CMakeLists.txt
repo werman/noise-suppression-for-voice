@@ -102,6 +102,11 @@ else()
         set(ENV{CMAKE_GENERATOR_PLATFORM} "${CMAKE_HOST_SYSTEM_PROCESSOR}")
     endif()
 
+    if(CMAKE_OSX_DEPLOYMENT_TARGET)
+        list(APPEND extra_compiler_flag_arguments
+            "-DCMAKE_OSX_DEPLOYMENT_TARGET=${CMAKE_OSX_DEPLOYMENT_TARGET}")
+    endif()
+
     # Looks like we're bootstrapping, reinvoke CMake
     execute_process(COMMAND "${CMAKE_COMMAND}"
             "."
