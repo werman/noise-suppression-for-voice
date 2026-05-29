@@ -21,7 +21,7 @@ endif ()
 
 set(LIBRARIES RnNoise)
 
-if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+if (NOT APPLE AND "${CMAKE_CXX_COMPILER_ID}" MATCHES "GNU|Clang")
     list(APPEND LIBRARIES atomic)
 endif()
 
