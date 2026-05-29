@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.22)
 
 # JUCE 7.0.1 uses APIs that are unavailable when targeting macOS 15+.
 if(NOT DEFINED CMAKE_OSX_DEPLOYMENT_TARGET
