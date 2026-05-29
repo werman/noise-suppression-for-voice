@@ -29,7 +29,9 @@ endif()
 
 target_link_libraries(${LADSPA_TARGET} RnNoisePluginCommon)
 
-set(COMPILE_OPTIONS "$<$<CONFIG:RELEASE>:-O3;>")
+set(COMPILE_OPTIONS
+        "$<$<AND:$<CONFIG:Release>,$<CXX_COMPILER_ID:MSVC>>:/O2>"
+        "$<$<AND:$<CONFIG:Release>,$<OR:$<CXX_COMPILER_ID:GNU>,$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>>>:-O3>")
 
 target_compile_options(${LADSPA_TARGET} PRIVATE ${COMPILE_OPTIONS})
 

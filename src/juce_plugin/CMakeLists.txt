@@ -78,7 +78,9 @@ function(compile_plugins formats suffix default_channels)
         target_link_libraries(${PLUGIN_NAME} PRIVATE juce::juce_recommended_lto_flags)
     endif ()
 
-    set(COMPILE_OPTIONS "$<$<CONFIG:RELEASE>:-O3;>")
+    set(COMPILE_OPTIONS
+            "$<$<AND:$<CONFIG:Release>,$<CXX_COMPILER_ID:MSVC>>:/O2>"
+            "$<$<AND:$<CONFIG:Release>,$<OR:$<CXX_COMPILER_ID:GNU>,$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>>>:-O3>")
     target_compile_options(${PLUGIN_NAME} PRIVATE ${COMPILE_OPTIONS})
 
     if (MINGW)
