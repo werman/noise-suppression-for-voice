@@ -1,4 +1,13 @@
 cmake_minimum_required(VERSION 3.10)
+
+# JUCE 7.0.1 uses APIs that are unavailable when targeting macOS 15+.
+if(NOT DEFINED CMAKE_OSX_DEPLOYMENT_TARGET
+        AND "$ENV{MACOSX_DEPLOYMENT_TARGET}" STREQUAL ""
+        AND (CMAKE_SYSTEM_NAME STREQUAL "Darwin"
+             OR (NOT CMAKE_SYSTEM_NAME AND CMAKE_HOST_SYSTEM_NAME STREQUAL "Darwin")))
+    set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0" CACHE STRING "Minimum macOS version to target")
+endif()
+
 project("Real-time Noise Suppression Plugin" VERSION 1.99)
 
 include(GNUInstallDirs)

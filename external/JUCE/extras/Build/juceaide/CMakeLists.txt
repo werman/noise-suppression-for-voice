@@ -65,6 +65,11 @@ else()
             "-DCMAKE_C_FLAGS=${CMAKE_C_FLAGS}"
             "-DCMAKE_EXE_LINKER_FLAGS=${CMAKE_EXE_LINKER_FLAGS}"
             "-DCMAKE_GENERATOR_PLATFORM=${CMAKE_GENERATOR_PLATFORM}")
+
+        if(CMAKE_OSX_DEPLOYMENT_TARGET)
+            list(APPEND extra_configure_flags
+                "-DCMAKE_OSX_DEPLOYMENT_TARGET=${CMAKE_OSX_DEPLOYMENT_TARGET}")
+        endif()
     endif()
 
     message(STATUS "Configuring juceaide")
