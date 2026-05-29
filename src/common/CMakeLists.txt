@@ -11,6 +11,14 @@ set(COMMON_SRC
 
 add_library(RnNoisePluginCommon STATIC ${COMMON_SRC})
 
+if (BUILD_FOR_RELEASE)
+    include(CheckIPOSupported)
+    check_ipo_supported(RESULT RNNOISE_COMMON_IPO_SUPPORTED OUTPUT RNNOISE_COMMON_IPO_ERROR)
+    if (RNNOISE_COMMON_IPO_SUPPORTED)
+        set_property(TARGET RnNoisePluginCommon PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
+    endif ()
+endif ()
+
 set(LIBRARIES RnNoise)
 
 if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
