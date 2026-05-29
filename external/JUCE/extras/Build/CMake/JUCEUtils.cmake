@@ -1889,6 +1889,7 @@ function(_juce_initialise_target target)
         ARA_FACTORY_ID
         ARA_DOCUMENT_ARCHIVE_ID
 
+        LV2_COPY_DIR
         VST_COPY_DIR
         VST3_COPY_DIR
         AAX_COPY_DIR
@@ -1941,6 +1942,7 @@ function(_juce_initialise_target target)
         COMPANY_WEBSITE
         COMPANY_EMAIL
         COMPANY_COPYRIGHT
+        LV2_COPY_DIR
         VST_COPY_DIR
         VST3_COPY_DIR
         AU_COPY_DIR
