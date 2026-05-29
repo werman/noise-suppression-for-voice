@@ -68,7 +68,6 @@ jobs:
           -DCMAKE_BUILD_TYPE=Release
           -DBUILD_FOR_RELEASE=1
           -DBUILD_VERSION=${{ inputs.tag }}
-          -DBUILD_LADSPA_PLUGIN=1
           -DBUILD_VST_PLUGIN=1
           -DBUILD_VST3_PLUGIN=1
           -DBUILD_LV2_PLUGIN=1
