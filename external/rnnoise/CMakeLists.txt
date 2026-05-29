@@ -3,6 +3,8 @@ project(RnNoise LANGUAGES C)
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
+option(RNNOISE_ENABLE_DEBUG_FLOAT "Enable RNNoise debug float weights instead of using quantized DNN weights where available" OFF)
+
 include_directories(src/)
 set(RN_NOISE_SRC
         src/celt_lpc.c
@@ -28,6 +30,10 @@ if(BUILD_RTCD)
 endif()
 
 add_library(RnNoise STATIC ${RN_NOISE_SRC})
+
+if(NOT RNNOISE_ENABLE_DEBUG_FLOAT)
+        target_compile_definitions(RnNoise PRIVATE DISABLE_DEBUG_FLOAT)
+endif()
 
 if(BUILD_RTCD)
         if(MSVC)
