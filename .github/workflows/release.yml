@@ -76,7 +76,7 @@ jobs:
 
       - name: Upload artifacts
         id: upload-artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.config.artifact_prefix }}-rnnoise
           path: |
@@ -91,10 +91,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
+        with:
+          pattern: "*-rnnoise"
 
-      # download-artifact@v3 unpacks artifacts
-      # See https://github.com/actions/download-artifact/issues/143
+      # download-artifact extracts each artifact into a directory named after
+      # the artifact. The distinct names are required by upload-artifact@v4's
+      # immutable artifact model.
       - name: Zip
         run: |
           zip -r linux-rnnoise linux-rnnoise
