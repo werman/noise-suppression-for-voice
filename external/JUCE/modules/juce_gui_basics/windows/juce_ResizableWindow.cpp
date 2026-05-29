@@ -60,27 +60,6 @@ ResizableWindow::~ResizableWindow()
 
 void ResizableWindow::initialise (const bool shouldAddToDesktop)
 {
-    /*
-      ==========================================================================
-
-       In accordance with the terms of the JUCE 7 End-Use License Agreement, the
-       JUCE Code in SECTION A cannot be removed, changed or otherwise rendered
-       ineffective unless you have a JUCE Indie or Pro license, or are using
-       JUCE under the GPL v3 license.
-
-       End User License Agreement: www.juce.com/juce-7-licence
-
-      ==========================================================================
-    */
-
-    // BEGIN SECTION A
-
-   #if ! JucePlugin_Build_Standalone
-    splashScreen = new JUCESplashScreen (*this);
-   #endif
-
-    // END SECTION A
-
     defaultConstrainer.setMinimumOnscreenAmounts (0x10000, 16, 24, 16);
 
     lastNonFullScreenPos.setBounds (50, 50, 256, 256);
