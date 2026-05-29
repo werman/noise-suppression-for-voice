@@ -82,7 +82,7 @@ context.modules = [
                 {
                     type = ladspa
                     name = rnnoise
-                    plugin = /path/to/librnnoise_ladspa.so
+                    plugin = librnnoise_ladspa
                     label = noise_suppressor_mono
                     control = {
                         "VAD Threshold (%)" = 85.0
@@ -108,7 +108,8 @@ context.modules = [
 ]
 ```
 
-- Change `/path/to/librnnoise_ladspa.so` to actual library path
+- Make sure `librnnoise_ladspa.so` is installed in a LADSPA plugin search path, for example `/usr/lib/ladspa/` or `/usr/lib64/ladspa/`.
+  Recent PipeWire versions resolve LADSPA plugins by name from the LADSPA search path and do not accept arbitrary absolute `.so` paths outside that path.
 - If you are **absolutely** sure that you need stereo output - change `noise_suppressor_mono` -> `noise_suppressor_stereo`. Even if your mic says that it is stereo - you probably don't need stereo output. It also would consume 2x resources.
 - Configure plugin parameters: `VAD Threshold (%)`, `VAD Grace Period (ms)`, `Retroactive VAD Grace (ms)`, and optionally `Dry Mix`.
 - Restart PipeWire: `systemctl restart --user pipewire.service`
