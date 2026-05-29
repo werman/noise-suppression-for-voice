@@ -35,12 +35,12 @@
 
   ID:                 juce_product_unlocking
   vendor:             juce
-  version:            7.0.1
+  version:            7.0.12
   name:               JUCE Online marketplace support
   description:        Classes for online product authentication
   website:            http://www.juce.com/juce
   license:            GPL/Commercial
-  minimumCppStandard: 14
+  minimumCppStandard: 17
 
   dependencies:       juce_cryptography
 

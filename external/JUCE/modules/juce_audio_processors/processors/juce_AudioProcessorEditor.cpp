@@ -56,6 +56,23 @@ void AudioProcessorEditor::hostMIDIControllerIsAvailable (bool)                {
 
 void AudioProcessorEditor::initialise()
 {
+    /*
+      ==========================================================================
+       In accordance with the terms of the JUCE 7 End-Use License Agreement, the
+       JUCE Code in SECTION A cannot be removed, changed or otherwise rendered
+       ineffective unless you have a JUCE Indie or Pro license, or are using
+       JUCE under the GPL v3 license.
+
+       End User License Agreement: www.juce.com/juce-7-licence
+      ==========================================================================
+    */
+
+    // BEGIN SECTION A
+
+    splashScreen = new JUCESplashScreen (*this);
+
+    // END SECTION A
+
     attachConstrainer (&defaultConstrainer);
     resizeListener.reset (new AudioProcessorEditorListener (*this));
     addComponentListener (resizeListener.get());
@@ -199,15 +216,25 @@ void AudioProcessorEditor::setScaleFactor (float newScale)
 typedef ComponentPeer* (*createUnityPeerFunctionType) (Component&);
 createUnityPeerFunctionType juce_createUnityPeerFn = nullptr;
 
-ComponentPeer* AudioProcessorEditor::createNewPeer (int styleFlags, void* nativeWindow)
+ComponentPeer* AudioProcessorEditor::createNewPeer ([[maybe_unused]] int styleFlags,
+                                                    [[maybe_unused]] void* nativeWindow)
 {
     if (juce_createUnityPeerFn != nullptr)
-    {
-        ignoreUnused (styleFlags, nativeWindow);
         return juce_createUnityPeerFn (*this);
-    }
 
     return Component::createNewPeer (styleFlags, nativeWindow);
+}
+
+bool AudioProcessorEditor::wantsLayerBackedView() const
+{
+   #if JUCE_MODULE_AVAILABLE_juce_opengl && JUCE_MAC
+    if (@available (macOS 10.14, *))
+        return true;
+
+    return false;
+   #else
+    return true;
+   #endif
 }
 
 } // namespace juce

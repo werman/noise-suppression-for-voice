@@ -5,8 +5,8 @@
 ;
 [subrepo]
 	remote = https://github.com/juce-framework/JUCE.git
-	branch = master
-	commit = b08520c2de1771af3dfcbfbc0e0b6b0b5eb083b0
-	parent = 763afdbc56871e0eb8a23129f3d5341a7ee869ee
+	branch = 7.0.12
+	commit = 4f43011b96eb0636104cb3e433894cda98243626
+	parent = 5986c13e1a63bd880a14dba12b97aea93dcee244
 	method = merge
 	cmdver = 0.4.3

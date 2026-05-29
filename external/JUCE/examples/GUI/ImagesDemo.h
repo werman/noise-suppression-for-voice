@@ -49,15 +49,13 @@
 #include "../Assets/DemoUtilities.h"
 
 //==============================================================================
-class ImagesDemo  : public Component,
-                    public FileBrowserListener
+class ImagesDemo final : public Component,
+                         public FileBrowserListener
 {
 public:
     ImagesDemo()
     {
         setOpaque (true);
-        imageList.setDirectory (File::getSpecialLocation (File::userPicturesDirectory), true, true);
-        directoryThread.startThread (1);
 
         fileTree.setTitle ("Files");
         fileTree.addListener (this);
@@ -81,6 +79,24 @@ public:
                                           -0.7);        // and its preferred size is 70% of the total available space
 
         setSize (500, 500);
+
+        RuntimePermissions::request (RuntimePermissions::readMediaImages, [self = SafePointer { this }] (bool granted)
+        {
+            if (self == nullptr)
+                return;
+
+            if (! granted)
+            {
+                AlertWindow::showMessageBoxAsync (MessageBoxIconType::WarningIcon,
+                                                  "Permissions warning",
+                                                  "External storage access permission not granted, some files"
+                                                  " may be inaccessible.");
+                return;
+            }
+
+            self->imageList.setDirectory (File::getSpecialLocation (File::userPicturesDirectory), true, true);
+            self->directoryThread.startThread (Thread::Priority::background);
+        });
     }
 
     ~ImagesDemo() override

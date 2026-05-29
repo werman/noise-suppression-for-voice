@@ -123,7 +123,7 @@ public:
     template <typename SpecialisationType>
     static const ARA::ARAFactory* createARAFactory()
     {
-        static_assert (std::is_base_of<ARADocumentControllerSpecialisation, SpecialisationType>::value,
+        static_assert (std::is_base_of_v<ARADocumentControllerSpecialisation, SpecialisationType>,
                        "DocumentController specialization types must inherit from ARADocumentControllerSpecialisation");
         return ARA::PlugIn::PlugInEntry::getPlugInEntry<FactoryConfig<SpecialisationType>>()->getFactory();
     }
@@ -281,6 +281,15 @@ protected:
     virtual ARA::PlugIn::ContentReader* doCreatePlaybackRegionContentReader        (ARA::PlugIn::PlaybackRegion* playbackRegion,
                                                                                     ARA::ARAContentType type,
                                                                                     const ARA::ARAContentTimeRange* range);
+
+    /** Override to implement getPlaybackRegionHeadAndTailTime().
+
+        This function is called within
+        ARA::PlugIn::DocumentControllerDelegate::doGetPlaybackRegionHeadAndTailTime.
+    */
+    virtual void                        doGetPlaybackRegionHeadAndTailTime         (const ARA::PlugIn::PlaybackRegion* playbackRegion,
+                                                                                    ARA::ARATimeDuration* headTime,
+                                                                                    ARA::ARATimeDuration* tailTime);
 
     //==============================================================================
     // ARAAudioSource analysis

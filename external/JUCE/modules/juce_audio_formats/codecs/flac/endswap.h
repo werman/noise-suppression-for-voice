@@ -1,5 +1,5 @@
 /* libFLAC - Free Lossless Audio Codec library
- * Copyright (C) 2012-2014  Xiph.org Foundation
+ * Copyright (C) 2012-2023  Xiph.Org Foundation
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -31,10 +31,10 @@
 
 /* It is assumed that this header will be included after "config.h". */
 
-#if HAVE_BSWAP32			/* GCC and Clang */
+#ifdef HAVE_BSWAP32			/* GCC and Clang */
 
 /* GCC prior to 4.8 didn't provide bswap16 on x86_64 */
-#if ! HAVE_BSWAP16
+#ifndef HAVE_BSWAP16
 static inline unsigned short __builtin_bswap16(unsigned short a)
 {
 	return (a<<8)|(a>>8);
@@ -43,30 +43,34 @@ static inline unsigned short __builtin_bswap16(unsigned short a)
 
 #define	ENDSWAP_16(x)		(__builtin_bswap16 (x))
 #define	ENDSWAP_32(x)		(__builtin_bswap32 (x))
+#define	ENDSWAP_64(x)		(__builtin_bswap64 (x))
 
-#elif defined _MSC_VER		/* Windows. Apparently in <stdlib.h>. */
+#elif defined _MSC_VER		/* Windows */
+
+#include <stdlib.h>
 
 #define	ENDSWAP_16(x)		(_byteswap_ushort (x))
 #define	ENDSWAP_32(x)		(_byteswap_ulong (x))
+#define	ENDSWAP_64(x)		(_byteswap_uint64 (x))
 
 #elif defined HAVE_BYTESWAP_H		/* Linux */
 
-// JUCE: removed as JUCE already includes standard headers and including
-// these in FlacNamespace will cause problems
-//#include <byteswap.h>
+#include <byteswap.h>
 
 #define	ENDSWAP_16(x)		(bswap_16 (x))
 #define	ENDSWAP_32(x)		(bswap_32 (x))
+#define	ENDSWAP_64(x)		(bswap_64 (x))
 
 #else
 
 #define	ENDSWAP_16(x)		((((x) >> 8) & 0xFF) | (((x) & 0xFF) << 8))
 #define	ENDSWAP_32(x)		((((x) >> 24) & 0xFF) | (((x) >> 8) & 0xFF00) | (((x) & 0xFF00) << 8) | (((x) & 0xFF) << 24))
+#define	ENDSWAP_64(x)		((ENDSWAP_32(((x) >> 32) & 0xFFFFFFFF)) | (ENDSWAP_32((x) & 0xFFFFFFFF) << 32))
 
 #endif
 
 
-/* Host to little-endian byte swapping. */
+/* Host to little-endian byte swapping (for MD5 calculation) */
 #if CPU_IS_BIG_ENDIAN
 
 #define H2LE_16(x)		ENDSWAP_16 (x)
