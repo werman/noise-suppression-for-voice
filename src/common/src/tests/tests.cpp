@@ -3,6 +3,9 @@
 
 #include "common/RnNoiseCommonPlugin.h"
 
+#include <cmath>
+#include <random>
+
 namespace {
 
 constexpr size_t kDenoiseBlockSize = 480;
@@ -19,6 +22,77 @@ struct MonoBuffers {
     const float *inputs[1];
     float *outputs[1];
 };
+
+using Signal = std::vector<std::vector<float>>;
+
+Signal makeSignal(size_t channels, size_t frames, uint32_t seed) {
+    std::mt19937 rng(seed);
+    std::uniform_real_distribution<float> noise(-0.05f, 0.05f);
+
+    Signal signal(channels, std::vector<float>(frames));
+    for (size_t ch = 0; ch < channels; ch++) {
+        for (size_t frame = 0; frame < frames; frame++) {
+            const float tone = 0.3f * std::sin(0.06f * static_cast<float>(frame) * static_cast<float>(ch + 1));
+            signal[ch][frame] = tone + noise(rng);
+        }
+    }
+    return signal;
+}
+
+/* Send the full signal through the plugin. Split it into calls of the given sizes.
+ * Repeat the sizes as necessary.
+ */
+Signal processInBlocks(RnNoiseCommonPlugin &plugin, const Signal &input, const std::vector<size_t> &blockSizes,
+                       float vadThreshold, uint32_t vadGracePeriodBlocks, uint32_t retroactiveVADGraceBlocks,
+                       float dryMix) {
+    const size_t channels = input.size();
+    const size_t frames = input[0].size();
+
+    Signal output(channels, std::vector<float>(frames, -1.f));
+    std::vector<const float *> inputs(channels);
+    std::vector<float *> outputs(channels);
+
+    size_t pos = 0;
+    for (size_t call = 0; pos < frames; call++) {
+        const size_t sampleFrames = std::min(blockSizes[call % blockSizes.size()], frames - pos);
+        for (size_t ch = 0; ch < channels; ch++) {
+            inputs[ch] = input[ch].data() + pos;
+            outputs[ch] = output[ch].data() + pos;
+        }
+
+        plugin.process(inputs.data(), outputs.data(), sampleFrames, vadThreshold, vadGracePeriodBlocks,
+                       retroactiveVADGraceBlocks, dryMix);
+        pos += sampleFrames;
+    }
+
+    return output;
+}
+
+std::vector<size_t> randomBlockSizes(uint32_t seed) {
+    std::mt19937 rng(seed);
+    std::uniform_int_distribution<size_t> small(1, 1100);
+    std::vector<size_t> sizes;
+    for (int i = 0; i < 64; i++) {
+        sizes.push_back(small(rng));
+    }
+    /* Offline hosts can send very large blocks. */
+    sizes.push_back(30000);
+    sizes.push_back(480);
+    sizes.push_back(1);
+    return sizes;
+}
+
+void requireDelayedCopy(const Signal &input, const Signal &output, size_t delay, size_t from = 0) {
+    for (size_t ch = 0; ch < input.size(); ch++) {
+        for (size_t frame = from; frame < output[ch].size(); frame++) {
+            const float expected = frame >= delay ? input[ch][frame - delay] : 0.f;
+            if (output[ch][frame] != expected) {
+                CAPTURE(ch, frame, delay, output[ch][frame], expected);
+                FAIL("Output is not input delayed by the reported latency");
+            }
+        }
+    }
+}
 
 } // namespace
 
@@ -58,20 +132,6 @@ TEST_CASE("VAD grace starts only after a voiced block", "[common_plugin]") {
     plugin.process(buffers.inputs, buffers.outputs, kDenoiseBlockSize, 1.f, 20, 0);
 
     REQUIRE(plugin.getStats().vadGraceBlocks == 1);
-}
-
-TEST_CASE("VAD grace absent state is restored when buffered output resets", "[common_plugin]") {
-    MonoBuffers buffers(kDenoiseBlockSize);
-
-    RnNoiseCommonPlugin plugin(1);
-    plugin.init();
-
-    plugin.process(buffers.inputs, buffers.outputs, kDenoiseBlockSize, 0.f, 20, 0);
-    plugin.process(buffers.inputs, buffers.outputs, kDenoiseBlockSize, 1.f, 20, 0, 1.f);
-    plugin.resetStats();
-    plugin.process(buffers.inputs, buffers.outputs, kDenoiseBlockSize, 1.f, 20, 0);
-
-    REQUIRE(plugin.getStats().vadGraceBlocks == 0);
 }
 
 TEST_CASE("Retroactive VAD grace starts only after a voiced block", "[common_plugin]") {
@@ -138,168 +198,115 @@ TEST_CASE("All options", "[common_plugin]") {
     }
 }
 
-TEST_CASE("Change Retroactive VAD", "[common_plugin]") {
-    auto sampleFrames = 512;
-    auto channels = 2;
-    auto startRetroactiveVADGraceBlocks = 10;
-    auto endRetroactiveVADGraceBlocks = 2;
+TEST_CASE("Latency is constant for any block sizes", "[common_plugin][latency]") {
+    auto channels = GENERATE(1, 2);
+    auto retroactiveVADGraceBlocks = GENERATE(0u, 1u, 3u);
+    auto seed = GENERATE(1u, 2u, 3u);
 
-    CAPTURE(startRetroactiveVADGraceBlocks, endRetroactiveVADGraceBlocks, channels, sampleFrames);
+    CAPTURE(channels, retroactiveVADGraceBlocks, seed);
 
-    RnNoiseCommonPlugin plugin(2);
-    plugin.init();
-
-    auto inputs = std::vector<const float *>();
-    auto outputs = std::vector<float *>();
-
-    uint32_t iterations = 10;
-    for (int i = 0; i < channels; i++) {
-        inputs.push_back(new float[sampleFrames * iterations]);
-        outputs.push_back(new float[sampleFrames * iterations]);
-    }
-
-    for (int i = 0; i < startRetroactiveVADGraceBlocks; i++) {
-        plugin.process(inputs.data(), outputs.data(), sampleFrames, 0.0,
-                       2, startRetroactiveVADGraceBlocks);
-    }
-
-    for (int i = 0; i < endRetroactiveVADGraceBlocks; i++) {
-        plugin.process(inputs.data(), outputs.data(), sampleFrames, 0.0,
-                       2, endRetroactiveVADGraceBlocks);
-    }
-
-    const RnNoiseStats stats = plugin.getStats();
-    REQUIRE(stats.blocksWaitingForOutput <= endRetroactiveVADGraceBlocks + 1);
-}
-
-TEST_CASE("Dry mix blends processed output with input", "[common_plugin]") {
-    constexpr auto channels = 2;
-    constexpr auto sampleFrames = 480;
-    constexpr auto dryMix = 0.25f;
-
-    std::vector<std::vector<float>> inputData(channels);
-    std::vector<const float *> inputs;
-    std::vector<std::vector<float>> wetOutputData(channels);
-    std::vector<std::vector<float>> mixedOutputData(channels);
-    std::vector<std::vector<float>> dryOutputData(channels);
-    std::vector<float *> wetOutputs;
-    std::vector<float *> mixedOutputs;
-    std::vector<float *> dryOutputs;
-
-    for (int ch = 0; ch < channels; ch++) {
-        inputData[ch].resize(sampleFrames);
-        wetOutputData[ch].resize(sampleFrames);
-        mixedOutputData[ch].resize(sampleFrames);
-        dryOutputData[ch].resize(sampleFrames);
-
-        for (int frame = 0; frame < sampleFrames; frame++) {
-            inputData[ch][frame] = 0.1f * static_cast<float>((frame % 17) - 8) / 8.f;
-        }
-
-        inputs.push_back(inputData[ch].data());
-        wetOutputs.push_back(wetOutputData[ch].data());
-        mixedOutputs.push_back(mixedOutputData[ch].data());
-        dryOutputs.push_back(dryOutputData[ch].data());
-    }
-
-    RnNoiseCommonPlugin wetPlugin(channels);
-    RnNoiseCommonPlugin mixedPlugin(channels);
-    RnNoiseCommonPlugin dryPlugin(channels);
-    wetPlugin.init();
-    mixedPlugin.init();
-    dryPlugin.init();
-
-    wetPlugin.process(inputs.data(), wetOutputs.data(), sampleFrames, 0.f, 20, 0, 0.f);
-    mixedPlugin.process(inputs.data(), mixedOutputs.data(), sampleFrames, 0.f, 20, 0, dryMix);
-    dryPlugin.process(inputs.data(), dryOutputs.data(), sampleFrames, 0.f, 20, 0, 1.f);
-
-    for (int ch = 0; ch < channels; ch++) {
-        for (int frame = 0; frame < sampleFrames; frame++) {
-            CAPTURE(ch, frame);
-
-            REQUIRE(dryOutputData[ch][frame] == Approx(inputData[ch][frame]));
-
-            const float expectedMixedOutput =
-                    wetOutputData[ch][frame] * (1.f - dryMix) + inputData[ch][frame] * dryMix;
-            REQUIRE(mixedOutputData[ch][frame] == Approx(expectedMixedOutput));
-        }
-    }
-}
-
-TEST_CASE("Dry-only mix bypasses RNNoise buffering for partial blocks", "[common_plugin]") {
-    constexpr auto channels = 2;
-    constexpr auto sampleFrames = 200;
-    constexpr auto dryMix = 1.f;
-
-    std::vector<std::vector<float>> inputData(channels);
-    std::vector<std::vector<float>> outputData(channels);
-    std::vector<const float *> inputs;
-    std::vector<float *> outputs;
-
-    for (int ch = 0; ch < channels; ch++) {
-        inputData[ch].resize(sampleFrames);
-        outputData[ch].resize(sampleFrames, -1.f);
-
-        for (int frame = 0; frame < sampleFrames; frame++) {
-            inputData[ch][frame] = 0.001f * static_cast<float>((ch + 1) * (frame + 1));
-        }
-
-        inputs.push_back(inputData[ch].data());
-        outputs.push_back(outputData[ch].data());
-    }
+    const Signal input = makeSignal(channels, 48000 * 3, seed);
 
     RnNoiseCommonPlugin plugin(channels);
     plugin.init();
 
-    plugin.process(inputs.data(), outputs.data(), sampleFrames, 0.f, 20, 0, dryMix);
+    /* With dry mix 1, the output is an exact copy of the delayed input. Use it to measure the delay. */
+    const Signal output = processInBlocks(plugin, input, randomBlockSizes(seed), 0.f, 20,
+                                          retroactiveVADGraceBlocks, 1.f);
 
-    for (int ch = 0; ch < channels; ch++) {
-        for (int frame = 0; frame < sampleFrames; frame++) {
-            CAPTURE(ch, frame);
-            REQUIRE(outputData[ch][frame] == Approx(inputData[ch][frame]));
+    requireDelayedCopy(input, output, RnNoiseCommonPlugin::getLatencySamples(retroactiveVADGraceBlocks));
+}
+
+TEST_CASE("Processed output does not depend on block sizes", "[common_plugin][latency]") {
+    auto channels = GENERATE(1, 2);
+    auto retroactiveVADGraceBlocks = GENERATE(0u, 2u);
+    auto vadThreshold = GENERATE(0.f, 0.5f);
+    auto dryMix = GENERATE(0.f, 0.3f);
+
+    CAPTURE(channels, retroactiveVADGraceBlocks, vadThreshold, dryMix);
+
+    const Signal input = makeSignal(channels, 48000 * 2, 7);
+
+    RnNoiseCommonPlugin reference(channels);
+    RnNoiseCommonPlugin randomBlocks(channels);
+    reference.init();
+    randomBlocks.init();
+
+    const Signal expected = processInBlocks(reference, input, {480}, vadThreshold, 20,
+                                            retroactiveVADGraceBlocks, dryMix);
+    const Signal actual = processInBlocks(randomBlocks, input, randomBlockSizes(11), vadThreshold, 20,
+                                          retroactiveVADGraceBlocks, dryMix);
+
+    for (size_t ch = 0; ch < input.size(); ch++) {
+        for (size_t frame = 0; frame < input[ch].size(); frame++) {
+            if (actual[ch][frame] != expected[ch][frame]) {
+                CAPTURE(ch, frame, actual[ch][frame], expected[ch][frame]);
+                FAIL("Output differs between block sizes");
+            }
         }
     }
 }
 
-TEST_CASE("Dry mix uses the same delayed timeline as wet output", "[common_plugin]") {
-    constexpr auto channels = 1;
-    constexpr auto sampleFrames = 200;
-    constexpr auto calls = 6;
-    constexpr auto dryMix = 0.25f;
-    constexpr auto wetMix = 1.f - dryMix;
+TEST_CASE("Change Retroactive VAD", "[common_plugin][latency]") {
+    auto startRetroactiveVADGraceBlocks = GENERATE(0u, 2u, 10u);
+    auto endRetroactiveVADGraceBlocks = GENERATE(0u, 2u, 10u);
+    constexpr auto channels = 2;
 
-    std::vector<float> inputData(sampleFrames * calls);
-    std::vector<float> wetOutputData(sampleFrames);
-    std::vector<float> mixedOutputData(sampleFrames);
+    CAPTURE(startRetroactiveVADGraceBlocks, endRetroactiveVADGraceBlocks);
 
-    for (int frame = 0; frame < sampleFrames * calls; frame++) {
-        inputData[frame] = 0.0001f * static_cast<float>(frame + 1);
+    const Signal input = makeSignal(channels, 48000 * 2, 5);
+    const size_t switchFrame = 48000;
+
+    RnNoiseCommonPlugin plugin(channels);
+    plugin.init();
+
+    std::vector<const float *> inputs(channels);
+    std::vector<float *> outputs(channels);
+    Signal output(channels, std::vector<float>(input[0].size()));
+
+    const std::vector<size_t> blockSizes = randomBlockSizes(3);
+    size_t pos = 0;
+    for (size_t call = 0; pos < input[0].size(); call++) {
+        const size_t sampleFrames = std::min(blockSizes[call % blockSizes.size()] % 1000 + 1,
+                                             input[0].size() - pos);
+        const uint32_t retro = pos < switchFrame ? startRetroactiveVADGraceBlocks : endRetroactiveVADGraceBlocks;
+        for (int ch = 0; ch < channels; ch++) {
+            inputs[ch] = input[ch].data() + pos;
+            outputs[ch] = output[ch].data() + pos;
+        }
+        plugin.process(inputs.data(), outputs.data(), sampleFrames, 0.f, 20, retro, 1.f);
+        pos += sampleFrames;
     }
+
+    /* After the change, the output must have the new latency. */
+    const size_t endLatency = RnNoiseCommonPlugin::getLatencySamples(endRetroactiveVADGraceBlocks);
+    requireDelayedCopy(input, output, endLatency, switchFrame + 1000 + 10 * 480 + 480);
+
+    REQUIRE(plugin.getStats().blocksWaitingForOutput <= endRetroactiveVADGraceBlocks + 2);
+}
+
+TEST_CASE("Dry mix blends processed output with delayed input", "[common_plugin]") {
+    constexpr auto channels = 2;
+    constexpr auto dryMix = 0.25f;
+
+    const Signal input = makeSignal(channels, 48000, 9);
+    const std::vector<size_t> blockSizes = {200, 512, 37};
 
     RnNoiseCommonPlugin wetPlugin(channels);
     RnNoiseCommonPlugin mixedPlugin(channels);
     wetPlugin.init();
     mixedPlugin.init();
 
-    for (int call = 0; call < calls; call++) {
-        const float *inputs[] = {inputData.data() + sampleFrames * call};
-        float *wetOutputs[] = {wetOutputData.data()};
-        float *mixedOutputs[] = {mixedOutputData.data()};
+    const Signal wet = processInBlocks(wetPlugin, input, blockSizes, 0.f, 20, 0, 0.f);
+    const Signal mixed = processInBlocks(mixedPlugin, input, blockSizes, 0.f, 20, 0, dryMix);
 
-        wetPlugin.process(inputs, wetOutputs, sampleFrames, 0.f, 20, 0, 0.f);
-        mixedPlugin.process(inputs, mixedOutputs, sampleFrames, 0.f, 20, 0, dryMix);
+    const size_t latency = RnNoiseCommonPlugin::getLatencySamples(0);
+    for (int ch = 0; ch < channels; ch++) {
+        for (size_t frame = 0; frame < input[ch].size(); frame++) {
+            CAPTURE(ch, frame);
 
-        for (int frame = 0; frame < sampleFrames; frame++) {
-            CAPTURE(call, frame);
-
-            float expectedDryOutput = 0.f;
-            if (call >= 2) {
-                expectedDryOutput = inputData[sampleFrames * (call - 2) + frame];
-            }
-
-            const float expectedMixedOutput =
-                    wetOutputData[frame] * wetMix + expectedDryOutput * dryMix;
-            REQUIRE(mixedOutputData[frame] == Approx(expectedMixedOutput));
+            const float dry = frame >= latency ? input[ch][frame - latency] : 0.f;
+            REQUIRE(mixed[ch][frame] == Approx(wet[ch][frame] * (1.f - dryMix) + dry * dryMix).margin(1e-6));
         }
     }
 }

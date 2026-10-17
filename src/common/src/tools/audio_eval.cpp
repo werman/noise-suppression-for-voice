@@ -446,7 +446,8 @@ std::vector<float> processAudio(const std::vector<float> &input, size_t sampleFr
     std::vector<float> padded = input;
     padded.resize(((padded.size() + sampleFrames - 1) / sampleFrames) * sampleFrames, 0.0f);
 
-    const size_t flushCalls = retroactiveVADGraceBlocks + 4u;
+    const size_t latency = RnNoiseCommonPlugin::getLatencySamples(retroactiveVADGraceBlocks);
+    const size_t flushCalls = (latency + sampleFrames - 1) / sampleFrames + 1u;
     std::vector<float> output(padded.size() + flushCalls * sampleFrames, 0.0f);
     std::vector<float> blockOut(sampleFrames, 0.0f);
     size_t outputOffset = 0;
@@ -821,14 +822,14 @@ void runRetroactiveVadCheck(const Options &options,
                       << " retroBlocks=" << stats.retroactiveVADGraceBlocks
                       << " vadGraceBlocks=" << stats.vadGraceBlocks
                       << " waiting=" << stats.blocksWaitingForOutput
-                      << " zeroedFrames=" << stats.outputFramesForcedToBeZeroed
                       << "\n";
 
             if (stats.retroactiveVADGraceBlocks == 0) {
                 throw std::runtime_error("Retroactive VAD did not unmute any blocks for " + name
                                          + " sampleFrames=" + std::to_string(sampleFrames));
             }
-            if (stats.blocksWaitingForOutput > options.retroactiveVadBlocks + 1u) {
+            /* The queue holds R + 1 latency blocks. One of these blocks can be partly sent to the output. */
+            if (stats.blocksWaitingForOutput > options.retroactiveVadBlocks + 2u) {
                 throw std::runtime_error("Retroactive VAD left too much buffered output for " + name
                                          + " sampleFrames=" + std::to_string(sampleFrames));
             }

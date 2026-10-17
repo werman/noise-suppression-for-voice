@@ -56,10 +56,9 @@ RnNoiseAudioProcessorEditor::RnNoiseAudioProcessorEditor(RnNoiseAudioProcessor &
 
     addAndMakeVisible(m_statsVadGraceBlocksLabel);
     addAndMakeVisible(m_statsRetroactiveVadGraceBlocksLabel);
-    addAndMakeVisible(m_statsBlocksWaitingForOutputLabel);
-    addAndMakeVisible(m_statsOutputFramesForcedToBeZeroedLabel);
+    addAndMakeVisible(m_statsLatencyLabel);
 
-    setSize(400, 440);
+    setSize(400, 420);
 }
 
 void RnNoiseAudioProcessorEditor::paint(juce::Graphics &g) {
@@ -95,9 +94,7 @@ void RnNoiseAudioProcessorEditor::resized() {
     flexBox.items.add(
             juce::FlexItem(m_statsRetroactiveVadGraceBlocksLabel).withWidth(width).withFlex(1.0));
     flexBox.items.add(
-            juce::FlexItem(m_statsBlocksWaitingForOutputLabel).withWidth(width).withFlex(1.0));
-    flexBox.items.add(
-            juce::FlexItem(m_statsOutputFramesForcedToBeZeroedLabel).withWidth(width).withFlex(1.0));
+            juce::FlexItem(m_statsLatencyLabel).withWidth(width).withFlex(1.0));
 
     flexBox.performLayout(getLocalBounds().toFloat());
 }
@@ -118,7 +115,7 @@ void RnNoiseAudioProcessorEditor::timerCallback() {
         return;
 
     RnNoiseStats stats = plugin->getStats();
-    m_processorRef.m_rnNoisePlugin->resetStats();
+    plugin->resetStats();
 
     juce::String statsVadGraceBlocksStr = juce::String("Unmuted via VAD: ");
     statsVadGraceBlocksStr << (int) stats.vadGraceBlocks * 10 << " ms";
@@ -128,13 +125,9 @@ void RnNoiseAudioProcessorEditor::timerCallback() {
     statsRetroactiveVadGraceBlocksStr << (int) stats.retroactiveVADGraceBlocks * 10 << " ms";
     m_statsRetroactiveVadGraceBlocksLabel.setText(statsRetroactiveVadGraceBlocksStr, juce::dontSendNotification);
 
-    juce::String statsBlocksWaitingForOutputStr = juce::String("Output queue: ");
-    statsBlocksWaitingForOutputStr << (int) stats.blocksWaitingForOutput * 10 << " ms";
-    m_statsBlocksWaitingForOutputLabel.setText(statsBlocksWaitingForOutputStr, juce::dontSendNotification);
-
-    juce::String statsOutputFramesForcedToBeZeroedStr = juce::String("Output stomped: ");
-    statsOutputFramesForcedToBeZeroedStr << (long long int) stats.outputFramesForcedToBeZeroed * 10 << " ms";
-    m_statsOutputFramesForcedToBeZeroedLabel.setText(statsOutputFramesForcedToBeZeroedStr, juce::dontSendNotification);
+    juce::String statsLatencyStr = juce::String("Latency: ");
+    statsLatencyStr << m_processorRef.getLatencySamples() * 1000 / 48000 << " ms";
+    m_statsLatencyLabel.setText(statsLatencyStr, juce::dontSendNotification);
 }
 
 RnNoiseAudioProcessorEditor::~RnNoiseAudioProcessorEditor() = default;

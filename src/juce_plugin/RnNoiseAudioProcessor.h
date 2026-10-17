@@ -4,7 +4,9 @@
 
 class RnNoiseCommonPlugin;
 
-class RnNoiseAudioProcessor : public juce::AudioProcessor {
+class RnNoiseAudioProcessor : public juce::AudioProcessor,
+                              private juce::AudioProcessorValueTreeState::Listener,
+                              private juce::AsyncUpdater {
 public:
     RnNoiseAudioProcessor();
 
@@ -44,6 +46,13 @@ public:
     void getStateInformation(juce::MemoryBlock &destData) override;
 
     void setStateInformation(const void *data, int sizeInBytes) override;
+
+private:
+    void parameterChanged(const juce::String &parameterID, float newValue) override;
+
+    void handleAsyncUpdate() override;
+
+    void updateLatency();
 
 public:
 

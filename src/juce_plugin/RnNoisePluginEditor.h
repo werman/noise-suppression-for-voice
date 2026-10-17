@@ -44,8 +44,7 @@ private:
     juce::Label m_statsHeaderLabel;
     juce::Label m_statsVadGraceBlocksLabel;
     juce::Label m_statsRetroactiveVadGraceBlocksLabel;
-    juce::Label m_statsBlocksWaitingForOutputLabel;
-    juce::Label m_statsOutputFramesForcedToBeZeroedLabel;
+    juce::Label m_statsLatencyLabel;
 
     RnNoiseAudioProcessor &m_processorRef;
 

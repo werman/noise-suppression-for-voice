@@ -36,9 +36,36 @@ RnNoiseAudioProcessor::RnNoiseAudioProcessor()
     m_vadRetroactiveGracePeriodParam = (juce::AudioParameterInt *) m_parameters.getParameter(
             "vad_retroactive_grace_period");
     m_mixParam = (juce::AudioParameterFloat *) m_parameters.getParameter("mix");
+
+    m_parameters.addParameterListener("vad_retroactive_grace_period", this);
+    updateLatency();
 }
 
-RnNoiseAudioProcessor::~RnNoiseAudioProcessor() = default;
+RnNoiseAudioProcessor::~RnNoiseAudioProcessor() {
+    m_parameters.removeParameterListener("vad_retroactive_grace_period", this);
+    cancelPendingUpdate();
+}
+
+void RnNoiseAudioProcessor::parameterChanged(const juce::String &parameterID, float newValue) {
+    juce::ignoreUnused(parameterID, newValue);
+
+    /* Hosts can change parameters on the audio thread. Report the latency on the message thread. */
+    if (juce::MessageManager::getInstanceWithoutCreating() != nullptr
+        && juce::MessageManager::getInstance()->isThisTheMessageThread()) {
+        updateLatency();
+    } else {
+        triggerAsyncUpdate();
+    }
+}
+
+void RnNoiseAudioProcessor::handleAsyncUpdate() {
+    updateLatency();
+}
+
+void RnNoiseAudioProcessor::updateLatency() {
+    const auto retroactiveVADGraceBlocks = static_cast<uint32_t>(m_vadRetroactiveGracePeriodParam->get());
+    setLatencySamples(static_cast<int>(RnNoiseCommonPlugin::getLatencySamples(retroactiveVADGraceBlocks)));
+}
 
 //==============================================================================
 const juce::String RnNoiseAudioProcessor::getName() const {
@@ -85,6 +112,7 @@ void RnNoiseAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock
 
     m_rnNoisePlugin = std::make_shared<RnNoiseCommonPlugin>(static_cast<uint32_t>(getTotalNumInputChannels()));
     m_rnNoisePlugin->init();
+    updateLatency();
 }
 
 void RnNoiseAudioProcessor::releaseResources() {
@@ -127,6 +155,11 @@ void RnNoiseAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
     for (int channel = 0; channel < totalNumInputChannels; ++channel) {
         in[channel] = buffer.getReadPointer(channel);
         out[channel] = buffer.getWritePointer(channel);
+    }
+
+    if (!m_rnNoisePlugin) {
+        buffer.clear();
+        return;
     }
 
     const float mix = m_mixParam->get();

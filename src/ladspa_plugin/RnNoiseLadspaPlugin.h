@@ -55,6 +55,15 @@ namespace port_info_custom {
                     1.f
             }
     };
+    /* Some hosts, for example the PipeWire filter-chain, read the port with this name.
+     * They use its value as the plugin latency in samples.
+     */
+    constexpr static port_info_t latency_output = {
+            "latency",
+            "The plugin latency, in samples.",
+            port_types::output | port_types::control,
+            {0, 0.f, 0.f}
+    };
 }
 
 struct RnNoiseMono {
@@ -66,6 +75,7 @@ struct RnNoiseMono {
         in_retroactive_vad_grace_blocks,
         in_placeholder1,
         in_placeholder2,
+        out_latency,
         size
     };
 
@@ -78,6 +88,7 @@ struct RnNoiseMono {
                     port_info_custom::retroactive_vad_grace_blocks_input,
                     port_info_custom::placeholder_input,
                     port_info_custom::dry_mix_input,
+                    port_info_custom::latency_output,
                     port_info_common::final_port
             };
 
@@ -120,6 +131,10 @@ struct RnNoiseMono {
 
         m_rnNoisePlugin->process(input, output, in_buffer.size(), vad_threshold_normalized,
                                  vad_grace_period_blocks, retroactive_vad_grace_blocks, dry_mix);
+
+        auto latency = ports.get<port_names::out_latency>();
+        static_cast<data &>(latency) = static_cast<data>(
+                RnNoiseCommonPlugin::getLatencySamples(retroactive_vad_grace_blocks));
     }
 
     std::unique_ptr<RnNoiseCommonPlugin> m_rnNoisePlugin;
@@ -136,6 +151,7 @@ struct RnNoiseStereo {
         in_retroactive_vad_grace_blocks,
         in_placeholder1,
         in_placeholder2,
+        out_latency,
         size
     };
 
@@ -150,6 +166,7 @@ struct RnNoiseStereo {
                     port_info_custom::retroactive_vad_grace_blocks_input,
                     port_info_custom::placeholder_input,
                     port_info_custom::dry_mix_input,
+                    port_info_custom::latency_output,
                     port_info_common::final_port
             };
 
@@ -196,6 +213,10 @@ struct RnNoiseStereo {
 
         m_rnNoisePlugin->process(input, output, in_buffer_l.size(), vad_threshold_normalized,
                                  vad_grace_period_blocks, retroactive_vad_grace_blocks, dry_mix);
+
+        auto latency = ports.get<port_names::out_latency>();
+        static_cast<data &>(latency) = static_cast<data>(
+                RnNoiseCommonPlugin::getLatencySamples(retroactive_vad_grace_blocks));
     }
 
     std::unique_ptr<RnNoiseCommonPlugin> m_rnNoisePlugin;
