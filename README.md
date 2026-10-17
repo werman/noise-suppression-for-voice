@@ -112,11 +112,15 @@ context.modules = [
             node.name =  "capture.rnnoise_source"
             node.passive = true
             audio.rate = 48000
+            audio.channels = 1
+            audio.position = [ MONO ]
         }
         playback.props = {
             node.name =  "rnnoise_source"
             media.class = Audio/Source
             audio.rate = 48000
+            audio.channels = 1
+            audio.position = [ MONO ]
         }
     }
 }
@@ -125,7 +129,8 @@ context.modules = [
 
 - Make sure `librnnoise_ladspa.so` is installed in a LADSPA plugin search path, for example `/usr/lib/ladspa/` or `/usr/lib64/ladspa/`.
   Recent PipeWire versions resolve LADSPA plugins by name from the LADSPA search path and do not accept arbitrary absolute `.so` paths outside that path.
-- If you are **absolutely** sure that you need stereo output - change `noise_suppressor_mono` -> `noise_suppressor_stereo`. Even if your mic says that it is stereo - you probably don't need stereo output. It also would consume 2x resources.
+- If you are **absolutely** sure that you need stereo output - change `noise_suppressor_mono` -> `noise_suppressor_stereo`. Then set `audio.channels = 2` and `audio.position = [ FL FR ]` in `capture.props` and `playback.props`. Even if your mic says that it is stereo - you probably don't need stereo output. It also would consume 2x resources.
+- Do not remove `audio.position = [ MONO ]`. Without it, a stereo microphone is 6 dB quieter.
 - Configure plugin parameters: `VAD Threshold (%)`, `VAD Grace Period (ms)`, `Retroactive VAD Grace (ms)`, and optionally `Dry Mix`.
 - Restart PipeWire: `systemctl restart --user pipewire.service`
 - Now you should be able to select `Noise Canceling source` as input device
