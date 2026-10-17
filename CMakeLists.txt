@@ -38,8 +38,17 @@ option(BUILD_AU_PLUGIN "If the AU plugin should be built (macOS only)" ON)
 option(BUILD_AUV3_PLUGIN "If the AUv3 plugin should be built (macOS only)" ON)
 option(BUILD_AUDIO_EVAL_TOOL "Build an executable for evaluating RNNoise on local audio datasets" OFF)
 
+# MSVC sets CMAKE_SYSTEM_PROCESSOR to the host CPU, also for a cross-build to ARM64.
+# Thus use the architecture of the compiler (x64, X86 or ARM64).
+if (MSVC)
+    set(TARGET_PROCESSOR "${CMAKE_CXX_COMPILER_ARCHITECTURE_ID}")
+else ()
+    set(TARGET_PROCESSOR "${CMAKE_SYSTEM_PROCESSOR}")
+endif ()
+string(TOLOWER "${TARGET_PROCESSOR}" TARGET_PROCESSOR)
+
 set(BUILD_RTCD_DEFAULT OFF)
-if (BUILD_FOR_RELEASE AND NOT APPLE AND CMAKE_SYSTEM_PROCESSOR MATCHES "x86|i686|AMD64|x86_64")
+if (BUILD_FOR_RELEASE AND NOT APPLE AND TARGET_PROCESSOR MATCHES "^(x86|i[3-6]86|amd64|x86_64|x64)$")
     set(BUILD_RTCD_DEFAULT ON)
 endif ()
 option(BUILD_RTCD "Enable x86 run-time CPU detection (x86 only)" ${BUILD_RTCD_DEFAULT})
