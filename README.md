@@ -77,6 +77,27 @@ See [detailed guide](https://medium.com/@bssankaran/free-and-open-source-softwar
 
 #### PipeWire
 
+##### Setup tool
+
+`noise-suppressor-setup` is a terminal tool. It sets up the plugin as a PipeWire virtual microphone.
+
+```sh
+noise-suppressor-setup
+```
+
+- Select the microphone and the plugin settings.
+- `[e]` echo test: record your voice, then compare the raw and the denoised recording.
+- `[a]` apply: save the settings and start the denoised source.
+- `[x]` remove: delete the config and stop the denoised source.
+
+Requirements:
+
+- PipeWire 0.3.45 or later, for example Ubuntu 22.10 or later.
+- Python 3 and the PipeWire command line tools (`pw-dump`, `pw-record`, `pw-play`).
+- The plugin in `/usr/lib/ladspa/` or `/usr/lib64/ladspa/`. For `cmake --install`, use `-DCMAKE_INSTALL_PREFIX=/usr`.
+
+##### Manual setup
+
 Since version `0.3.45` PipeWire uses [Split-File Configuration](https://gitlab.freedesktop.org/pipewire/pipewire/-/wikis/Config-PipeWire#split-file-configuration), making it extremely easy to set up plugins and tweak configuration.
 
 For older PipeWire version you'd have to copy `/usr/share/pipewire/pipewire.conf` into `~/.config/pipewire/pipewire.conf` and then append the configuration below to already existing `context.modules`.

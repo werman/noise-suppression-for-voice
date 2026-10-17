@@ -1,0 +1,1399 @@
+#!/usr/bin/env python3
+"""Terminal UI to set up "Noise Suppressor for Voice" as a PipeWire virtual microphone.
+
+The tool writes a filter-chain config for the LADSPA plugin and runs it with the
+PipeWire "filter-chain.service" (PipeWire 0.3.57 or later, with systemd). Without that
+service, it writes the config to pipewire.conf.d (PipeWire 0.3.45 or later), and the
+main PipeWire daemon runs it. It can also run an echo test with the current
+settings, before they are applied. The echo test does not need systemd.
+
+The plugin must be installed in a LADSPA search path, for example /usr/lib/ladspa.
+Only the Python standard library and the PipeWire command line tools are necessary.
+"""
+
+import argparse
+import curses
+import json
+import math
+import os
+import re
+import shutil
+import signal
+import subprocess
+import sys
+import tempfile
+import time
+import wave
+from array import array
+
+TOOL_NAME = "noise-suppressor-setup"
+SETTINGS_MARKER = "# noise-suppressor-setup settings: "
+CONFIG_FILE_NAME = "99-noise-suppressor.conf"
+PLUGIN_FILE_NAME = "librnnoise_ladspa.so"
+
+SOURCE_NODE_NAME = "rnnoise_source"
+CAPTURE_NODE_NAME = "capture.rnnoise_source"
+TEST_SOURCE_NODE_NAME = "rnnoise_echo_test_source"
+TEST_CAPTURE_NODE_NAME = "capture.rnnoise_echo_test_source"
+OWN_NODE_NAMES = {SOURCE_NODE_NAME, CAPTURE_NODE_NAME, TEST_SOURCE_NODE_NAME, TEST_CAPTURE_NODE_NAME}
+
+DEFAULT_TARGET = ""
+
+# Run the filter in filter-chain.service, with the config in filter-chain.conf.d.
+MODE_FILTER_CHAIN = "filter-chain"
+# Run the filter in the main PipeWire daemon, with the config in pipewire.conf.d.
+MODE_PIPEWIRE = "pipewire"
+
+# PipeWire 0.3.45 loads conf.d directories. 0.3.57 adds filter-chain.service.
+MIN_CONF_D_VERSION = (0, 3, 45)
+MIN_FILTER_CHAIN_SERVICE_VERSION = (0, 3, 57)
+
+DEFAULT_SETTINGS = {
+    "target": DEFAULT_TARGET,
+    "stereo": False,
+    "vad_threshold": 85,
+    "vad_grace_ms": 200,
+    "retroactive_grace_ms": 0,
+    "dry_mix": 0.0,
+    "description": "Noise Canceling source",
+    "make_default": False,
+    "test_seconds": 5,
+}
+
+
+# ---------------------------------------------------------------------------
+# Paths and environment
+
+
+def config_home():
+    return os.environ.get("XDG_CONFIG_HOME") or os.path.join(os.path.expanduser("~"), ".config")
+
+
+def filter_chain_conf_d_dir():
+    return os.path.join(config_home(), "pipewire", "filter-chain.conf.d")
+
+
+def pipewire_conf_d_dir():
+    return os.path.join(config_home(), "pipewire", "pipewire.conf.d")
+
+
+def config_path(mode):
+    directory = filter_chain_conf_d_dir() if mode == MODE_FILTER_CHAIN else pipewire_conf_d_dir()
+    return os.path.join(directory, CONFIG_FILE_NAME)
+
+
+def ladspa_search_dirs(ladspa_path):
+    """Returns the directories in the order that PipeWire uses.
+    If LADSPA_PATH is set, PipeWire uses only it.
+    """
+    env = [d for d in (ladspa_path or "").split(":") if d]
+    if env:
+        return env
+    return ["/usr/lib64/ladspa", "/usr/lib/ladspa", "/usr/lib/x86_64-linux-gnu/ladspa",
+            "/usr/lib/aarch64-linux-gnu/ladspa"]
+
+
+def find_plugin(ladspa_path):
+    for directory in ladspa_search_dirs(ladspa_path):
+        path = os.path.join(directory, PLUGIN_FILE_NAME)
+        if os.path.isfile(path):
+            return path
+    return None
+
+
+def find_plugin_outside_search_path():
+    """Returns a plugin copy that PipeWire does not load, or None. This helps to explain a missing plugin."""
+    home = os.path.expanduser("~")
+    for directory in [os.path.join(home, ".ladspa"), "/usr/local/lib/ladspa", "/usr/local/lib64/ladspa"]:
+        path = os.path.join(directory, PLUGIN_FILE_NAME)
+        if os.path.isfile(path):
+            return path
+    return None
+
+
+def missing_tools():
+    """Returns the missing commands that the echo test and apply need. systemctl is optional."""
+    tools = ["pipewire", "pw-dump", "pw-record", "pw-play"]
+    return [tool for tool in tools if shutil.which(tool) is None]
+
+
+def run(args, timeout=15):
+    """Runs a command. Returns (exit code, combined output)."""
+    try:
+        result = subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                universal_newlines=True, timeout=timeout)
+        return result.returncode, result.stdout.strip()
+    except (OSError, subprocess.TimeoutExpired) as error:
+        return 1, str(error)
+
+
+# ---------------------------------------------------------------------------
+# PipeWire queries
+
+
+def pw_dump():
+    code, output = run(["pw-dump"])
+    if code != 0:
+        return []
+    try:
+        return json.loads(output)
+    except ValueError:
+        return []
+
+
+def audio_nodes(objects=None):
+    """Returns the audio nodes as a list of dicts with id, name, description, media_class and channels."""
+    nodes = []
+    for obj in objects if objects is not None else pw_dump():
+        if obj.get("type") != "PipeWire:Interface:Node":
+            continue
+        props = obj.get("info", {}).get("props", {})
+        media_class = props.get("media.class", "")
+        if not media_class.startswith(("Audio/", "Stream/Input/Audio")):
+            continue
+        nodes.append({
+            "id": obj.get("id"),
+            "name": props.get("node.name", ""),
+            "description": props.get("node.description") or props.get("node.nick") or props.get("node.name", ""),
+            "media_class": media_class,
+            "channels": props.get("audio.channels"),
+            "priority": props.get("priority.session") or 0,
+        })
+    return nodes
+
+
+def microphones(objects=None):
+    """Returns the hardware and virtual sources, except the sources of this tool."""
+    return [node for node in audio_nodes(objects)
+            if node["media_class"] == "Audio/Source" and node["name"] not in OWN_NODE_NAMES]
+
+
+def linked_source_name(node_name, objects):
+    """Returns the name of the microphone that is linked to the input of a node, or None."""
+    node = find_node(node_name, objects)
+    if node is None:
+        return None
+    names = {mic["id"]: mic["name"] for mic in microphones(objects)}
+    for obj in objects:
+        if obj.get("type") != "PipeWire:Interface:Link":
+            continue
+        info = obj.get("info", {})
+        if info.get("input-node-id") == node["id"] and info.get("output-node-id") in names:
+            return names[info["output-node-id"]]
+    return None
+
+
+def find_node(name, objects=None):
+    for node in audio_nodes(objects):
+        if node["name"] == name:
+            return node
+    return None
+
+
+def default_source_name(objects=None):
+    for obj in objects if objects is not None else pw_dump():
+        if obj.get("type") != "PipeWire:Interface:Metadata":
+            continue
+        for item in obj.get("metadata") or []:
+            if item.get("key") == "default.audio.source":
+                value = item.get("value")
+                if isinstance(value, dict):
+                    return value.get("name")
+                try:
+                    return json.loads(value).get("name")
+                except (TypeError, ValueError, AttributeError):
+                    return None
+    return None
+
+
+def wait_for_node(name, timeout):
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        node = find_node(name)
+        if node is not None:
+            return node
+        time.sleep(0.2)
+    return None
+
+
+# ---------------------------------------------------------------------------
+# System detection
+
+
+def pipewire_version():
+    """Returns the version of the PipeWire library as a tuple, or None if it is not known."""
+    _, output = run(["pipewire", "--version"])
+    # The linked library is the one that runs. Old versions print only one line.
+    match = (re.search(r"Linked with libpipewire\s+(\d+)\.(\d+)\.(\d+)", output)
+             or re.search(r"libpipewire\s+(\d+)\.(\d+)\.(\d+)", output))
+    if match is None:
+        return None
+    return tuple(int(part) for part in match.groups())
+
+
+def version_text(version):
+    return ".".join(str(part) for part in version) if version else "unknown"
+
+
+def version_at_least(version, minimum):
+    """An unknown version counts as new."""
+    return version is None or version >= minimum
+
+
+def systemctl_user(*args):
+    if shutil.which("systemctl") is None:
+        return 1, "systemctl is not installed"
+    return run(["systemctl", "--user"] + list(args), timeout=30)
+
+
+def unit_exists(unit):
+    code, _ = systemctl_user("cat", unit)
+    return code == 0
+
+
+def unit_active(unit):
+    code, output = systemctl_user("is-active", unit)
+    return code == 0 and output.splitlines()[-1:] == ["active"]
+
+
+def daemon_ladspa_path(pipewire_service):
+    """Returns LADSPA_PATH of the PipeWire daemon.
+    A systemd service gets the environment of the systemd user manager, not of this shell.
+    """
+    if not pipewire_service:
+        return os.environ.get("LADSPA_PATH", "")
+    code, output = systemctl_user("show-environment")
+    if code != 0:
+        return os.environ.get("LADSPA_PATH", "")
+    for line in output.splitlines():
+        if line.startswith("LADSPA_PATH="):
+            return line[len("LADSPA_PATH="):]
+    return ""
+
+
+def pulseaudio_server():
+    """Returns the server name if a real PulseAudio (not pipewire-pulse) runs, else None."""
+    if shutil.which("pactl") is None:
+        return None
+    code, output = run(["pactl", "info"], timeout=5)
+    if code != 0:
+        return None
+    match = re.search(r"^Server Name:\s*(.+)$", output, re.MULTILINE)
+    if match and "pipewire" not in match.group(1).lower():
+        return match.group(1).strip()
+    return None
+
+
+def has_sound_devices(objects):
+    """Returns True if PipeWire runs at least one ALSA or Bluetooth device node."""
+    for obj in objects:
+        if obj.get("type") != "PipeWire:Interface:Node":
+            continue
+        props = obj.get("info", {}).get("props", {})
+        if props.get("device.api") in ("alsa", "bluez5") or props.get("api.alsa.path"):
+            return True
+    return False
+
+
+def detect_setup(objects):
+    """Returns a dict that describes how this system runs PipeWire.
+
+    mode: MODE_FILTER_CHAIN, MODE_PIPEWIRE, or None if the tool cannot apply a config.
+    version_problem: why apply cannot work, or None. The echo test can still work.
+    server_problems: why neither apply nor the echo test can work.
+    """
+    version = pipewire_version()
+    pipewire_service = unit_active("pipewire.service")
+    filter_chain_unit = pipewire_service and unit_exists("filter-chain.service")
+
+    if (pipewire_service and filter_chain_unit
+            and version_at_least(version, MIN_FILTER_CHAIN_SERVICE_VERSION)):
+        mode = MODE_FILTER_CHAIN
+    elif version_at_least(version, MIN_CONF_D_VERSION):
+        mode = MODE_PIPEWIRE
+    else:
+        mode = None
+
+    version_problem = None
+    if mode is None:
+        version_problem = "PipeWire {} is too old to apply a config. Apply needs {} or later.".format(
+            version_text(version), version_text(MIN_CONF_D_VERSION))
+    problems = []
+    pulseaudio = pulseaudio_server()
+    if pulseaudio:
+        problems.append("The sound server is {}, not PipeWire. Apps do not see PipeWire sources.".format(pulseaudio))
+    elif not has_sound_devices(objects):
+        problems.append("PipeWire has no sound devices. Is PipeWire the sound server of this session?")
+
+    return {
+        "version": version,
+        "mode": mode,
+        "pipewire_service": pipewire_service,
+        "filter_chain_unit": filter_chain_unit,
+        "shell_ladspa_path": os.environ.get("LADSPA_PATH", ""),
+        "daemon_ladspa_path": daemon_ladspa_path(pipewire_service),
+        "version_problem": version_problem,
+        "server_problems": problems,
+    }
+
+
+def setup_description(setup):
+    version = version_text(setup["version"])
+    if setup["mode"] == MODE_FILTER_CHAIN:
+        return "PipeWire {}, filter-chain.service".format(version)
+    if setup["mode"] == MODE_PIPEWIRE:
+        reason = "no filter-chain.service"
+        if not setup["pipewire_service"]:
+            reason = "PipeWire does not run as a systemd service"
+        elif not version_at_least(setup["version"], MIN_FILTER_CHAIN_SERVICE_VERSION):
+            reason = "filter-chain.service needs PipeWire {}".format(
+                version_text(MIN_FILTER_CHAIN_SERVICE_VERSION))
+        return "PipeWire {}, main daemon via pipewire.conf.d ({})".format(version, reason)
+    return "PipeWire {}, not supported".format(version)
+
+
+# ---------------------------------------------------------------------------
+# Config generation
+
+
+def latency_ms(settings):
+    return 30 + settings["retroactive_grace_ms"] // 10 * 10
+
+
+def quote(text):
+    return '"' + str(text).replace("\\", "\\\\").replace('"', '\\"') + '"'
+
+
+def filter_chain_module(settings, source_name, capture_name, description, nofail=False):
+    """Returns the filter-chain module entry in the PipeWire SPA-JSON format.
+    With nofail, PipeWire continues to run when the module cannot load.
+    """
+    label = "noise_suppressor_stereo" if settings["stereo"] else "noise_suppressor_mono"
+    # Always set the channel positions. Without a position, PipeWire maps a stereo
+    # microphone to the mono input at half level (-6 dB).
+    if settings["stereo"]:
+        channels = "            audio.channels = 2\n            audio.position = [ FL FR ]\n"
+    else:
+        channels = "            audio.channels = 1\n            audio.position = [ MONO ]\n"
+    target = ""
+    if settings["target"]:
+        # WirePlumber before 0.4.10 and pipewire-media-session read only node.target.
+        # Newer versions read target.object.
+        target = "            target.object = {0}\n            node.target = {0}\n".format(quote(settings["target"]))
+
+    return """{{   name = libpipewire-module-filter-chain
+    args = {{
+        node.description = {description}
+        media.name = {description}
+        filter.graph = {{
+            nodes = [
+                {{
+                    type = ladspa
+                    name = rnnoise
+                    plugin = librnnoise_ladspa
+                    label = {label}
+                    control = {{
+                        "VAD Threshold (%)" = {vad_threshold:.1f}
+                        "VAD Grace Period (ms)" = {vad_grace}
+                        "Retroactive VAD Grace (ms)" = {retro}
+                        "Dry Mix" = {dry_mix:.2f}
+                    }}
+                }}
+            ]
+        }}
+        capture.props = {{
+            node.name = {capture_name}
+            node.passive = true
+            audio.rate = 48000
+{channels}{target}        }}
+        playback.props = {{
+            node.name = {source_name}
+            media.class = Audio/Source
+            audio.rate = 48000
+{channels}        }}
+    }}
+{flags}}}""".format(description=quote(description), label=label,
+             vad_threshold=float(settings["vad_threshold"]), vad_grace=int(settings["vad_grace_ms"]),
+             retro=int(settings["retroactive_grace_ms"]),
+             dry_mix=float(settings["dry_mix"]), capture_name=quote(capture_name),
+             source_name=quote(source_name), channels=channels, target=target,
+             flags="    flags = [ nofail ]\n" if nofail else "")
+
+
+def generate_config(settings):
+    saved = {key: settings[key] for key in DEFAULT_SETTINGS}
+    # A broken filter must not stop the other modules in the same daemon.
+    # In pipewire.conf.d, that is all audio.
+    module = filter_chain_module(settings, SOURCE_NODE_NAME, CAPTURE_NODE_NAME, settings["description"],
+                                 nofail=True)
+    return ("# Generated by {tool}. Changes in this file are lost when the tool saves it again.\n"
+            "{marker}{saved}\n"
+            "# Latency: {latency} ms.\n"
+            "context.modules = [\n{module}\n]\n").format(
+        tool=TOOL_NAME, marker=SETTINGS_MARKER, saved=json.dumps(saved, sort_keys=True),
+        latency=latency_ms(settings), module=module)
+
+
+def generate_test_config(settings):
+    """Returns a full config for a separate "pipewire -c" process, used by the echo test."""
+    module = filter_chain_module(settings, TEST_SOURCE_NODE_NAME, TEST_CAPTURE_NODE_NAME,
+                                 "Noise Suppressor echo test")
+    return """context.properties = {{
+    log.level = 2
+}}
+context.spa-libs = {{
+    audio.convert.* = audioconvert/libspa-audioconvert
+    support.*       = support/libspa-support
+}}
+context.modules = [
+    {{ name = libpipewire-module-rt
+        args = {{ }}
+        flags = [ ifexists nofail ]
+    }}
+    {{ name = libpipewire-module-protocol-native }}
+    {{ name = libpipewire-module-client-node }}
+    {{ name = libpipewire-module-adapter }}
+{module}
+]
+""".format(module=module)
+
+
+def clamp_settings(settings):
+    result = dict(DEFAULT_SETTINGS)
+    result.update({key: value for key, value in settings.items() if key in DEFAULT_SETTINGS})
+    result["vad_threshold"] = int(min(max(float(result["vad_threshold"]), 0), 99))
+    result["vad_grace_ms"] = int(min(max(float(result["vad_grace_ms"]), 0), 1000))
+    result["retroactive_grace_ms"] = int(min(max(float(result["retroactive_grace_ms"]), 0), 200)) // 10 * 10
+    result["dry_mix"] = round(min(max(float(result["dry_mix"]), 0.0), 1.0), 2)
+    result["test_seconds"] = int(min(max(float(result["test_seconds"]), 2), 30))
+    result["stereo"] = bool(result["stereo"])
+    result["make_default"] = bool(result["make_default"])
+    result["target"] = str(result["target"] or "")
+    result["description"] = str(result["description"] or DEFAULT_SETTINGS["description"])
+    return result
+
+
+def parse_config_text(text):
+    """Reads settings from a config. It reads the settings line of this tool,
+    or the values of a hand-written config, as in the README.
+    """
+    for line in text.splitlines():
+        if line.startswith(SETTINGS_MARKER):
+            try:
+                return clamp_settings(json.loads(line[len(SETTINGS_MARKER):]))
+            except (ValueError, TypeError):
+                break
+
+    settings = dict(DEFAULT_SETTINGS)
+    patterns = {
+        "vad_threshold": r'"VAD Threshold \(%\)"\s*=\s*([0-9.]+)',
+        "vad_grace_ms": r'"VAD Grace Period \(ms\)"\s*=\s*([0-9.]+)',
+        "retroactive_grace_ms": r'"Retroactive VAD Grace \(ms\)"\s*=\s*([0-9.]+)',
+        "dry_mix": r'"Dry Mix"\s*=\s*([0-9.]+)',
+    }
+    for key, pattern in patterns.items():
+        match = re.search(pattern, text)
+        if match:
+            settings[key] = float(match.group(1))
+    match = re.search(r'target\.object\s*=\s*"?([^"\s}]+)"?', text)
+    if match:
+        settings["target"] = match.group(1)
+    match = re.search(r'node\.description\s*=\s*"([^"]*)"', text)
+    if match:
+        settings["description"] = match.group(1)
+    settings["stereo"] = "noise_suppressor_stereo" in text
+    return clamp_settings(settings)
+
+
+def is_own_config(text):
+    return SETTINGS_MARKER in text
+
+
+def conflicting_configs(mode):
+    """Returns the configs in pipewire.conf.d that load this plugin, except the config of this mode.
+    They conflict with the config of this tool.
+    """
+    directory = pipewire_conf_d_dir()
+    own_path = config_path(mode)
+    found = []
+    try:
+        names = sorted(os.listdir(directory))
+    except OSError:
+        return found
+    for name in names:
+        path = os.path.join(directory, name)
+        if path == own_path or not name.endswith(".conf") or not os.path.isfile(path):
+            continue
+        try:
+            with open(path) as config:
+                if "librnnoise_ladspa" in config.read():
+                    found.append(path)
+        except OSError:
+            pass
+    return found
+
+
+def read_text(path):
+    """Returns the content of a file, or None if it does not exist."""
+    try:
+        with open(path) as file:
+            return file.read()
+    except OSError:
+        return None
+
+
+def load_settings(mode):
+    """Returns (settings, source). The source is the file the settings come from, or None."""
+    # Prefer a config that this tool wrote, for example in the other mode, to a hand-written one.
+    others = sorted(conflicting_configs(mode), key=lambda path: not is_own_config(read_text(path) or ""))
+    for path in [config_path(mode)] + others:
+        text = read_text(path)
+        if text is not None:
+            return parse_config_text(text), path
+    return dict(DEFAULT_SETTINGS), None
+
+
+def write_text(path, text):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    temp_path = path + ".tmp"
+    with open(temp_path, "w") as file:
+        file.write(text)
+    os.replace(temp_path, path)
+
+
+def write_config(settings, mode):
+    """Writes the config. Makes a backup of a file that this tool did not write. Returns the backup path."""
+    path = config_path(mode)
+    backup = None
+    old_text = read_text(path)
+    if old_text is not None and not is_own_config(old_text):
+        backup = path + ".bak-" + time.strftime("%Y%m%d-%H%M%S")
+        shutil.copy2(path, backup)
+    write_text(path, generate_config(settings))
+    return backup
+
+
+def other_filter_chain_configs():
+    try:
+        return [name for name in os.listdir(filter_chain_conf_d_dir())
+                if name.endswith(".conf") and name != CONFIG_FILE_NAME]
+    except OSError:
+        return []
+
+
+# ---------------------------------------------------------------------------
+# Services
+
+APPLY_OK = "ok"
+APPLY_FAILED = "failed"
+# The config is written, but the user must restart PipeWire.
+APPLY_MANUAL = "manual"
+
+MANUAL_RESTART_TEXT = "Restart PipeWire to load the config, for example log out and log in again."
+
+
+def service_unit(mode):
+    return "filter-chain.service" if mode == MODE_FILTER_CHAIN else "pipewire.service"
+
+
+def service_state():
+    _, active = systemctl_user("is-active", "filter-chain.service")
+    _, enabled = systemctl_user("is-enabled", "filter-chain.service")
+    return active.splitlines()[-1] if active else "unknown", enabled.splitlines()[-1] if enabled else "unknown"
+
+
+def journal_errors(unit, since, count=4):
+    """Returns the last warning and error lines of a unit since a time.time() value."""
+    if shutil.which("journalctl") is None:
+        return []
+    args = ["journalctl", "--user", "-u", unit, "--since", "@{}".format(int(since)), "-o", "cat", "--no-pager"]
+    code, output = run(args + ["-p", "warning"])
+    lines = output.splitlines() if code == 0 else []
+    if not lines:
+        # Some setups log all lines with the same priority. Search the text.
+        code, output = run(args)
+        lines = [line for line in output.splitlines()
+                 if code == 0 and re.search(r"\[E\]|\[W\]|error|fail", line, re.IGNORECASE)]
+    return [line for line in lines if "-- No entries --" not in line][-count:]
+
+
+def restart_pipewire(setup, log):
+    """Restarts the main PipeWire daemon. Returns APPLY_OK, APPLY_FAILED or APPLY_MANUAL."""
+    if not setup["pipewire_service"]:
+        log(MANUAL_RESTART_TEXT)
+        return APPLY_MANUAL
+    log("Restarting pipewire.service. All audio stops for a moment...")
+    code, output = systemctl_user("restart", "pipewire.service")
+    if code != 0:
+        log("Cannot restart pipewire.service: " + output)
+        return APPLY_FAILED
+    time.sleep(1.0)
+    return APPLY_OK
+
+
+def apply_settings(settings, setup, disable_conflicts, log):
+    """Writes the config and restarts the service that runs it.
+    Returns APPLY_OK, APPLY_FAILED or APPLY_MANUAL.
+    """
+    mode = setup["mode"]
+    started = time.time()
+    backup = write_config(settings, mode)
+    log("Config written: " + config_path(mode))
+    if backup:
+        log("Old file saved as: " + backup)
+
+    need_pipewire_restart = mode == MODE_PIPEWIRE
+    if disable_conflicts:
+        for path in conflicting_configs(mode):
+            disabled = path + ".disabled"
+            os.replace(path, disabled)
+            log("Old config disabled: " + disabled)
+            need_pipewire_restart = True
+
+    if need_pipewire_restart:
+        result = restart_pipewire(setup, log)
+        if result != APPLY_OK:
+            return result
+
+    if mode == MODE_FILTER_CHAIN:
+        code, output = systemctl_user("enable", "filter-chain.service")
+        if code != 0:
+            log("Cannot enable filter-chain.service: " + output)
+            return APPLY_FAILED
+        log("Restarting filter-chain.service...")
+        code, output = systemctl_user("restart", "filter-chain.service")
+        if code != 0:
+            log("Cannot restart filter-chain.service: " + output)
+            return APPLY_FAILED
+
+    unit = service_unit(mode)
+    node = wait_for_node(SOURCE_NODE_NAME, 10.0)
+    if node is None:
+        log("The source did not appear. See: journalctl --user -u " + unit)
+        for line in journal_errors(unit, started):
+            log("  " + line)
+        return APPLY_FAILED
+    log("Source is running: {} (node {})".format(settings["description"], node["id"]))
+
+    if settings["make_default"]:
+        if shutil.which("wpctl") is None:
+            log("Cannot set the default input: wpctl is not installed.")
+        else:
+            code, output = run(["wpctl", "set-default", str(node["id"])])
+            log("Set as default input." if code == 0 else "Cannot set the default input: " + output)
+    return APPLY_OK
+
+
+def restore_config(setup, old_text, log):
+    """Writes back the config from before apply, or removes the config if there was none."""
+    path = config_path(setup["mode"])
+    if old_text is None:
+        if os.path.exists(path):
+            os.remove(path)
+        log("New config removed: " + path)
+    else:
+        write_text(path, old_text)
+        log("Previous config restored: " + path)
+    if setup["mode"] == MODE_FILTER_CHAIN:
+        systemctl_user("restart", "filter-chain.service")
+    else:
+        restart_pipewire(setup, log)
+
+
+def remove_setup(setup, log):
+    mode = setup["mode"]
+    path = config_path(mode)
+    if os.path.exists(path):
+        os.remove(path)
+        log("Config removed: " + path)
+    else:
+        log("No config to remove.")
+    if mode == MODE_PIPEWIRE:
+        restart_pipewire(setup, log)
+    elif other_filter_chain_configs():
+        log("Other filter-chain configs exist. Restarting filter-chain.service...")
+        systemctl_user("restart", "filter-chain.service")
+    else:
+        log("Stopping and disabling filter-chain.service...")
+        systemctl_user("disable", "--now", "filter-chain.service")
+    return True
+
+
+# ---------------------------------------------------------------------------
+# Echo test
+
+
+def wav_level_db(path, skip_seconds=0.3):
+    """Returns (RMS dB, 10th percentile of 50 ms RMS dB) for a 16-bit WAV file.
+    The percentile shows the noise floor in pauses.
+    """
+    try:
+        with wave.open(path, "rb") as wav:
+            if wav.getsampwidth() != 2:
+                return None
+            rate = wav.getframerate()
+            channels = wav.getnchannels()
+            samples = array("h")
+            samples.frombytes(wav.readframes(wav.getnframes()))
+    except (OSError, EOFError, wave.Error):
+        return None
+    if sys.byteorder == "big":
+        samples.byteswap()
+    samples = samples[int(skip_seconds * rate) * channels:]
+    if not samples:
+        return None
+
+    def to_db(sum_squares, count):
+        if count == 0 or sum_squares <= 0:
+            return -120.0
+        return max(10 * math.log10(sum_squares / count / (32768.0 * 32768.0)), -120.0)
+
+    window = max(int(rate * 0.05) * channels, 1)
+    windows = []
+    total = 0.0
+    for start in range(0, len(samples), window):
+        part = samples[start:start + window]
+        energy = float(sum(s * s for s in part))
+        total += energy
+        windows.append(to_db(energy, len(part)))
+    windows.sort()
+    return to_db(total, len(samples)), windows[len(windows) // 10]
+
+
+class EchoTest:
+    """Runs a temporary filter chain with the given settings. Records the raw and the denoised input."""
+
+    def __init__(self, settings, raw_target):
+        # The test filter reads the same microphone as the raw recording.
+        # Thus it never reads the installed denoised source.
+        self.settings = dict(settings, target=raw_target)
+        self.raw_target = raw_target
+        self.directory = tempfile.mkdtemp(prefix="noise-suppressor-echo-")
+        self.raw_path = os.path.join(self.directory, "raw.wav")
+        self.denoised_path = os.path.join(self.directory, "denoised.wav")
+        self.log_path = os.path.join(self.directory, "pipewire.log")
+        self.chain = None
+        self.recorders = []
+
+    def start_chain(self):
+        config = os.path.join(self.directory, "echo-test.conf")
+        with open(config, "w") as file:
+            file.write(generate_test_config(self.settings))
+        with open(self.log_path, "w") as log:
+            self.chain = subprocess.Popen(["pipewire", "-c", config], stdout=log, stderr=subprocess.STDOUT)
+        deadline = time.monotonic() + 5.0
+        while time.monotonic() < deadline:
+            # A config error stops the process at once. Do not wait for the timeout then.
+            if self.chain.poll() is not None:
+                break
+            if find_node(TEST_SOURCE_NODE_NAME) is not None:
+                return True
+            time.sleep(0.2)
+        self.stop()
+        return False
+
+    def error_lines(self, count=3):
+        """Returns the last error lines of the test PipeWire process. The most specific error is first."""
+        text = read_text(self.log_path) or ""
+        errors = [line for line in text.splitlines() if line.startswith("[E]")]
+        if not errors:
+            errors = [line for line in text.splitlines() if line.strip()][-count:]
+        # Remove the "[E][time] topic | [file:line function()]" prefix. Old versions have no topic.
+        prefix = r"^\[E\]\[[^\]]*\]\s*(\S+\s*\|\s*)?(\[[^\]]*\]\s*)?"
+        return [re.sub(prefix, "", line).strip() for line in errors[:count]]
+
+    def start_recording(self):
+        channels = "2" if self.settings["stereo"] else "1"
+        common = ["pw-record", "--rate", "48000", "--channels", channels, "--format", "s16"]
+        self.recorders = [
+            subprocess.Popen(common + ["--target", self.raw_target, self.raw_path],
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL),
+            subprocess.Popen(common + ["--target", TEST_SOURCE_NODE_NAME, self.denoised_path],
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL),
+        ]
+
+    def stop_recording(self):
+        # SIGINT lets pw-record finish the WAV header.
+        for recorder in self.recorders:
+            if recorder.poll() is None:
+                recorder.send_signal(signal.SIGINT)
+        for recorder in self.recorders:
+            try:
+                recorder.wait(timeout=3)
+            except subprocess.TimeoutExpired:
+                recorder.kill()
+        self.recorders = []
+
+    def stop(self):
+        self.stop_recording()
+        if self.chain is not None and self.chain.poll() is None:
+            self.chain.terminate()
+            try:
+                self.chain.wait(timeout=3)
+            except subprocess.TimeoutExpired:
+                self.chain.kill()
+        self.chain = None
+
+    def cleanup(self):
+        self.stop()
+        shutil.rmtree(self.directory, ignore_errors=True)
+
+
+def resolve_raw_target(settings, objects=None):
+    """Returns the node name of the real microphone for the echo test, or None."""
+    if settings["target"]:
+        return settings["target"]
+    if objects is None:
+        objects = pw_dump()
+    name = default_source_name(objects)
+    if name and name not in OWN_NODE_NAMES:
+        return name
+    # The default input is the denoised source. Use the microphone of the installed filter.
+    name = linked_source_name(CAPTURE_NODE_NAME, objects)
+    if name:
+        return name
+    # Use the microphone that PipeWire would select first.
+    mics = sorted(microphones(objects), key=lambda mic: mic["priority"], reverse=True)
+    return mics[0]["name"] if mics else None
+
+
+# ---------------------------------------------------------------------------
+# Terminal UI
+
+
+class Field:
+    def __init__(self, key, label, kind, minimum=0, maximum=0, step=1, big_step=10, help_text=""):
+        self.key = key
+        self.label = label
+        self.kind = kind
+        self.minimum = minimum
+        self.maximum = maximum
+        self.step = step
+        self.big_step = big_step
+        self.help_text = help_text
+
+
+FIELDS = [
+    Field("target", "Microphone", "device", help_text="Enter: select the input device to clean."),
+    Field("stereo", "Channels", "bool", help_text="Mono is enough for voice. Stereo uses 2x CPU."),
+    Field("vad_threshold", "VAD threshold (%)", "int", 0, 99, 1, 5,
+          help_text="Below this voice probability the gate closes. 85-95 is a good start. 0 disables the gate."),
+    Field("vad_grace_ms", "VAD grace period (ms)", "int", 0, 1000, 10, 100,
+          help_text="The gate stays open this long after voice. Helps when ends of words are cut."),
+    Field("retroactive_grace_ms", "Retroactive VAD grace (ms)", "int", 0, 200, 10, 50,
+          help_text="Opens the gate before voice starts. Helps with cut word starts. Adds the same latency."),
+    Field("dry_mix", "Dry mix", "float", 0.0, 1.0, 0.05, 0.25,
+          help_text="How much unprocessed input to mix in. 0 is fully processed. 0.05-0.1 keeps quiet room noise."),
+    Field("description", "Source name", "text", help_text="Enter: the name that applications show."),
+    Field("make_default", "Make default input on apply", "bool",
+          help_text="Sets the denoised source as the system default input after apply."),
+    Field("test_seconds", "Echo test length (s)", "int", 2, 30, 1, 5,
+          help_text="How long the echo test records."),
+]
+
+KEYS_HELP = "Up/Down select  Left/Right change  PgUp/PgDn big step  Enter edit  " \
+            "[e] echo test  [a] apply  [x] remove  [q] quit"
+
+
+class App:
+    def __init__(self, screen):
+        self.screen = screen
+        self.selected = 0
+        self.messages = []
+        self.devices = []
+        self.refresh_status()
+        self.settings, self.loaded_from = load_settings(self.mode)
+        if self.loaded_from:
+            self.message("Settings loaded from " + self.loaded_from)
+        if self.loaded_from and self.loaded_from in self.conflicts:
+            self.message("This is another config in pipewire.conf.d. Apply replaces it with " +
+                         config_path(self.mode))
+
+    # -- state
+
+    def refresh_status(self):
+        objects = pw_dump()
+        self.setup = detect_setup(objects)
+        # Apply uses the mode of filter-chain.service if the tool cannot apply at all.
+        # Then the paths in the UI are still valid.
+        self.mode = self.setup["mode"] or MODE_FILTER_CHAIN
+        self.devices = microphones(objects)
+        self.default_source = default_source_name(objects)
+        self.running_node = find_node(SOURCE_NODE_NAME, objects)
+        # The PipeWire daemon and the echo test can see different LADSPA_PATH values.
+        self.plugin_path = find_plugin(self.setup["daemon_ladspa_path"])
+        self.test_plugin_path = find_plugin(self.setup["shell_ladspa_path"])
+        self.service = service_state() if self.setup["mode"] == MODE_FILTER_CHAIN else None
+        self.conflicts = conflicting_configs(self.mode)
+
+    def target_missing(self):
+        """Returns True if the selected microphone is not connected."""
+        target = self.settings["target"]
+        return bool(target) and target not in [device["name"] for device in self.devices]
+
+    def message(self, text):
+        self.messages.append(text)
+        self.messages = self.messages[-6:]
+
+    def device_label(self, name):
+        if not name:
+            label = "System default input"
+            if self.default_source:
+                label += " (now: {})".format(self.describe_node(self.default_source))
+            return label
+        return self.describe_node(name)
+
+    def describe_node(self, name):
+        for device in self.devices:
+            if device["name"] == name:
+                return device["description"]
+        if name == SOURCE_NODE_NAME:
+            return self.settings["description"] + " (this filter)"
+        return name + " (not connected)"
+
+    def value_text(self, field):
+        value = self.settings[field.key]
+        if field.key == "target":
+            return self.device_label(value)
+        if field.key == "stereo":
+            return "Stereo" if value else "Mono"
+        if field.kind == "bool":
+            return "Yes" if value else "No"
+        if field.kind == "float":
+            return "{:.2f}".format(value)
+        return str(value)
+
+    def change(self, field, direction, big=False):
+        if field.kind == "bool":
+            self.settings[field.key] = not self.settings[field.key]
+        elif field.kind in ("int", "float"):
+            step = field.big_step if big else field.step
+            value = self.settings[field.key] + direction * step
+            value = min(max(value, field.minimum), field.maximum)
+            self.settings[field.key] = round(value, 2) if field.kind == "float" else int(value)
+        elif field.kind == "device":
+            names = [DEFAULT_TARGET] + [device["name"] for device in self.devices]
+            current = names.index(self.settings["target"]) if self.settings["target"] in names else 0
+            self.settings["target"] = names[(current + direction) % len(names)]
+
+    # -- drawing
+
+    def put(self, y, x, text, attr=0):
+        height, width = self.screen.getmaxyx()
+        if 0 <= y < height and x < width - 1:
+            try:
+                self.screen.addnstr(y, x, text, width - 1 - x, attr)
+            except curses.error:
+                pass
+
+    def draw(self):
+        self.screen.erase()
+        bold = curses.A_BOLD
+        self.put(0, 0, "Noise Suppressor for Voice - PipeWire setup", bold | curses.A_UNDERLINE)
+
+        y = 2
+        label_width = max(len(field.label) for field in FIELDS) + 2
+        for index, field in enumerate(FIELDS):
+            attr = curses.A_REVERSE if index == self.selected else 0
+            self.put(y, 2, field.label.ljust(label_width), attr)
+            self.put(y, 2 + label_width, " " + self.value_text(field) + " ", attr | bold)
+            y += 1
+
+        y += 1
+        self.put(y, 2, FIELDS[self.selected].help_text, curses.A_DIM)
+        y += 1
+        self.put(y, 2, "Latency: {} ms".format(latency_ms(self.settings)))
+        y += 2
+
+        self.put(y, 0, "Status", bold)
+        y += 1
+        self.put(y, 2, "Setup: " + setup_description(self.setup))
+        y += 1
+        for problem in self.setup["server_problems"] + [self.setup["version_problem"]]:
+            if problem:
+                self.put(y, 2, "PROBLEM: " + problem)
+                y += 1
+        if self.plugin_path:
+            self.put(y, 2, "Plugin: " + self.plugin_path)
+        elif self.test_plugin_path:
+            self.put(y, 2, "Plugin: NOT FOUND for PipeWire. Only LADSPA_PATH of this shell has " +
+                     self.test_plugin_path)
+        else:
+            other = find_plugin_outside_search_path()
+            text = "Plugin: NOT FOUND in the PipeWire LADSPA search path"
+            if other:
+                text += " (PipeWire does not load {})".format(other)
+            self.put(y, 2, text)
+        y += 1
+        if self.test_plugin_path and self.test_plugin_path != self.plugin_path:
+            self.put(y, 2, "The echo test uses {}, from LADSPA_PATH of this shell.".format(self.test_plugin_path))
+            y += 1
+            self.put(y, 2, "The PipeWire daemon does not get this LADSPA_PATH. "
+                           "Install the plugin in /usr/lib/ladspa, or see: systemctl --user set-environment")
+            y += 1
+        if self.service:
+            self.put(y, 2, "filter-chain.service: {} ({})".format(*self.service))
+            y += 1
+        if self.target_missing():
+            self.put(y, 2, "The selected microphone is not connected. PipeWire uses the default input instead.")
+            y += 1
+        if self.running_node:
+            source = "running (node {})".format(self.running_node["id"])
+            if self.default_source == SOURCE_NODE_NAME:
+                source += ", default input"
+        else:
+            source = "not running"
+        self.put(y, 2, "Denoised source: " + source)
+        y += 1
+        for path in self.conflicts:
+            self.put(y, 2, "Other config that loads the plugin: " + path)
+            y += 1
+
+        y += 1
+        for text in self.messages:
+            self.put(y, 2, text)
+            y += 1
+
+        height, _ = self.screen.getmaxyx()
+        self.put(height - 1, 0, KEYS_HELP, curses.A_REVERSE)
+        self.screen.refresh()
+
+    # -- dialogs
+
+    def ask_yes_no(self, question):
+        lines = question.split("\n")
+        while True:
+            self.screen.erase()
+            for index, line in enumerate(lines):
+                self.put(1 + index, 2, line)
+            self.put(2 + len(lines), 2, "[y] Yes   [n] No", curses.A_BOLD)
+            self.screen.refresh()
+            key = self.screen.getch()
+            if key in (ord("y"), ord("Y")):
+                return True
+            if key in (ord("n"), ord("N"), 27, ord("q")):
+                return False
+
+    def edit_text(self, title, value):
+        curses.curs_set(1)
+        text = value
+        while True:
+            self.screen.erase()
+            self.put(1, 2, title, curses.A_BOLD)
+            self.put(3, 2, "> " + text)
+            self.put(5, 2, "Enter: save   Esc: cancel", curses.A_DIM)
+            self.screen.move(3, min(4 + len(text), self.screen.getmaxyx()[1] - 2))
+            self.screen.refresh()
+            key = self.screen.get_wch()
+            if key in ("\n", "\r", curses.KEY_ENTER):
+                curses.curs_set(0)
+                return text
+            if key == "\x1b":
+                curses.curs_set(0)
+                return None
+            if key in (curses.KEY_BACKSPACE, "\x7f", "\b"):
+                text = text[:-1]
+            elif isinstance(key, str) and key.isprintable():
+                text += key
+
+    def pick_device(self):
+        self.refresh_status()
+        options = [(DEFAULT_TARGET, self.device_label(DEFAULT_TARGET))]
+        options += [(device["name"], "{}  [{}]".format(device["description"], device["name"]))
+                    for device in self.devices]
+        names = [name for name, _ in options]
+        index = names.index(self.settings["target"]) if self.settings["target"] in names else 0
+        while True:
+            self.screen.erase()
+            self.put(1, 2, "Select the microphone", curses.A_BOLD)
+            for row, (_, label) in enumerate(options):
+                self.put(3 + row, 4, label, curses.A_REVERSE if row == index else 0)
+            self.put(4 + len(options), 2, "Enter: select   Esc: cancel   r: refresh", curses.A_DIM)
+            self.screen.refresh()
+            key = self.screen.getch()
+            if key == curses.KEY_UP:
+                index = (index - 1) % len(options)
+            elif key == curses.KEY_DOWN:
+                index = (index + 1) % len(options)
+            elif key in (10, 13, curses.KEY_ENTER):
+                self.settings["target"] = options[index][0]
+                return
+            elif key in (27, ord("q")):
+                return
+            elif key == ord("r"):
+                return self.pick_device()
+
+    def progress(self, title, lines=()):
+        self.screen.erase()
+        self.put(1, 2, title, curses.A_BOLD)
+        for index, line in enumerate(lines):
+            self.put(3 + index, 2, line)
+        self.screen.refresh()
+
+    # -- actions
+
+    def check_ready(self, for_apply):
+        """Returns True if the echo test (for_apply False) or apply can run. Else shows why not."""
+        tools = missing_tools()
+        if tools:
+            self.message("Missing commands: " + ", ".join(tools))
+            return False
+        problems = list(self.setup["server_problems"])
+        if for_apply and self.setup["version_problem"]:
+            problems.append(self.setup["version_problem"])
+        if problems:
+            for problem in problems:
+                self.message(problem)
+            return False
+        plugin = self.plugin_path if for_apply else self.test_plugin_path
+        if not plugin:
+            if for_apply and self.test_plugin_path:
+                self.message("The PipeWire daemon does not find {}. Only LADSPA_PATH of this shell has it."
+                             .format(PLUGIN_FILE_NAME))
+            else:
+                self.message("{} is not installed in a LADSPA search path.".format(PLUGIN_FILE_NAME))
+            return False
+        return True
+
+    def echo_test(self):
+        if not self.check_ready(for_apply=False):
+            return
+        if self.target_missing():
+            self.message("The selected microphone is not connected. Select another one for the test.")
+            return
+        raw_target = resolve_raw_target(self.settings)
+        if raw_target is None:
+            self.message("No microphone found. Select a microphone for the test.")
+            return
+
+        test = EchoTest(dict(self.settings), raw_target)
+        try:
+            self.progress("Echo test", ["Starting a temporary filter with the current settings..."])
+            if not test.start_chain():
+                self.message("The test filter did not start. PipeWire says:")
+                for line in test.error_lines() or ["(no output)"]:
+                    self.message("  " + line)
+                return
+
+            # The filter must run for a short time before the recording starts.
+            time.sleep(0.5)
+            test.start_recording()
+            seconds = self.settings["test_seconds"]
+            start = time.monotonic()
+            self.screen.timeout(100)
+            cancelled = False
+            while True:
+                left = seconds - (time.monotonic() - start)
+                if left <= 0:
+                    break
+                bar_width = 40
+                done = int(bar_width * (1 - left / seconds))
+                self.progress("Echo test - RECORDING", [
+                    "Speak now. Make some noise too, for example typing.",
+                    "Microphone: " + self.device_label(raw_target),
+                    "",
+                    "[" + "#" * done + "." * (bar_width - done) + "] {:.1f} s".format(left),
+                    "",
+                    "Esc: cancel",
+                ])
+                if self.screen.getch() == 27:
+                    cancelled = True
+                    break
+            self.screen.timeout(-1)
+            test.stop()
+            if cancelled:
+                self.message("Echo test cancelled.")
+                return
+            self.playback_menu(test)
+        finally:
+            self.screen.timeout(-1)
+            test.cleanup()
+
+    def playback_menu(self, test):
+        raw_level = wav_level_db(test.raw_path)
+        denoised_level = wav_level_db(test.denoised_path)
+
+        def level_text(level):
+            if level is None:
+                return "no data"
+            return "average {:.1f} dB, noise floor {:.1f} dB".format(*level)
+
+        lines = [
+            "Denoised: " + level_text(denoised_level),
+            "Raw:      " + level_text(raw_level),
+            "",
+            "[d] play denoised   [r] play raw   [Esc] back",
+            "Any key stops the playback.",
+        ]
+        self.play(test.denoised_path, "Playing denoised recording...", lines)
+        while True:
+            self.progress("Echo test - results", lines)
+            key = self.screen.getch()
+            if key == ord("d"):
+                self.play(test.denoised_path, "Playing denoised recording...", lines)
+            elif key == ord("r"):
+                self.play(test.raw_path, "Playing raw recording...", lines)
+            elif key in (27, ord("q")):
+                return
+
+    def play(self, path, title, lines):
+        if not os.path.exists(path):
+            return
+        player = subprocess.Popen(["pw-play", path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        self.screen.timeout(100)
+        try:
+            while player.poll() is None:
+                self.progress(title, lines)
+                if self.screen.getch() != -1:
+                    player.terminate()
+                    break
+        finally:
+            self.screen.timeout(-1)
+            try:
+                player.wait(timeout=2)
+            except subprocess.TimeoutExpired:
+                player.kill()
+
+    def restart_text(self):
+        """Returns what apply and remove restart, for the questions."""
+        if self.mode == MODE_FILTER_CHAIN:
+            return "restart filter-chain.service.\nOnly the denoised source restarts. Other audio does not stop."
+        if self.setup["pipewire_service"]:
+            return "restart pipewire.service.\nAll audio stops for a moment."
+        return "not restart anything. " + MANUAL_RESTART_TEXT
+
+    def apply(self):
+        if not self.check_ready(for_apply=True):
+            return
+        if self.settings["make_default"] and not self.settings["target"]:
+            self.message("Select a microphone. The default input cannot be both the input and the output.")
+            return
+        if self.target_missing() and not self.ask_yes_no(
+                "The selected microphone is not connected:\n  {}\n\n"
+                "Until it is connected, PipeWire uses the default input. Apply anyway?".format(self.settings["target"])):
+            return
+
+        path = config_path(self.mode)
+        disable_conflicts = False
+        if self.conflicts:
+            question = ("These configs also load the plugin:\n  " + "\n  ".join(self.conflicts) +
+                        "\n\nThey conflict with the new config. Rename them to *.disabled?\n"
+                        "Then write {} and {}").format(path, self.restart_text())
+            if self.mode == MODE_FILTER_CHAIN:
+                question += "\nTo unload the old configs, pipewire.service restarts once. All audio stops for a moment."
+            if not self.ask_yes_no(question):
+                self.message("Apply cancelled. The old config is unchanged.")
+                return
+            disable_conflicts = True
+        elif not self.ask_yes_no("Write {}\nand {}".format(path, self.restart_text())):
+            return
+
+        old_text = read_text(path)
+        self.progress("Applying...")
+        result = apply_settings(self.settings, self.setup, disable_conflicts, self.message)
+        if result == APPLY_FAILED and os.path.exists(path):
+            question = ("The denoised source did not start. The messages show why.\n\n" +
+                        ("Restore the previous config?" if old_text is not None else "Remove the new config?"))
+            self.refresh_status()
+            self.draw()
+            if self.ask_yes_no(question):
+                self.progress("Restoring...")
+                restore_config(self.setup, old_text, self.message)
+        self.refresh_status()
+
+    def remove(self):
+        path = config_path(self.mode)
+        if not os.path.exists(path):
+            self.message("Nothing to remove: " + path)
+            return
+        if not self.ask_yes_no("Delete {}\nand {}".format(path, self.restart_text())):
+            return
+        remove_setup(dict(self.setup, mode=self.mode), self.message)
+        self.refresh_status()
+
+    # -- main loop
+
+    def loop(self):
+        while True:
+            self.draw()
+            key = self.screen.getch()
+            field = FIELDS[self.selected]
+            # Esc does not quit. An unknown key sequence starts with Esc too.
+            if key == ord("q"):
+                return
+            if key == curses.KEY_UP:
+                self.selected = (self.selected - 1) % len(FIELDS)
+            elif key == curses.KEY_DOWN:
+                self.selected = (self.selected + 1) % len(FIELDS)
+            elif key in (curses.KEY_LEFT, ord("-")):
+                self.change(field, -1)
+            elif key in (curses.KEY_RIGHT, ord("+"), ord("=")):
+                self.change(field, 1)
+            elif key == curses.KEY_PPAGE:
+                self.change(field, 1, big=True)
+            elif key == curses.KEY_NPAGE:
+                self.change(field, -1, big=True)
+            elif key in (10, 13, curses.KEY_ENTER, ord(" ")):
+                self.edit(field)
+            elif key == ord("e"):
+                self.echo_test()
+            elif key == ord("a"):
+                self.apply()
+            elif key == ord("x"):
+                self.remove()
+            elif key == ord("r"):
+                self.refresh_status()
+            elif key == curses.KEY_RESIZE:
+                pass
+
+    def edit(self, field):
+        if field.kind == "device":
+            self.pick_device()
+        elif field.kind == "bool":
+            self.change(field, 1)
+        elif field.kind == "text":
+            text = self.edit_text(field.label, self.settings[field.key])
+            if text and text.strip():
+                self.settings[field.key] = text.strip()
+        else:
+            text = self.edit_text("{} ({} .. {})".format(field.label, field.minimum, field.maximum),
+                                  str(self.settings[field.key]))
+            if text is None:
+                return
+            try:
+                value = float(text)
+            except ValueError:
+                self.message("Not a number: " + text)
+                return
+            value = min(max(value, field.minimum), field.maximum)
+            if field.key == "retroactive_grace_ms":
+                value = value // 10 * 10
+            self.settings[field.key] = round(value, 2) if field.kind == "float" else int(value)
+
+
+def main_ui(screen):
+    curses.curs_set(0)
+    screen.keypad(True)
+    curses.use_default_colors()
+    App(screen).loop()
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    parser.add_argument("--print-config", action="store_true",
+                        help="print the config for the saved settings and exit")
+    args = parser.parse_args()
+
+    if args.print_config:
+        setup = detect_setup(pw_dump())
+        settings, _ = load_settings(setup["mode"] or MODE_FILTER_CHAIN)
+        sys.stdout.write(generate_config(settings))
+        return 0
+
+    os.environ.setdefault("ESCDELAY", "25")
+    curses.wrapper(main_ui)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
