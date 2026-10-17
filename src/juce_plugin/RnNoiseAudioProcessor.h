@@ -16,10 +16,15 @@ public:
 
     void releaseResources() override;
 
+    void reset() override;
+
     bool isBusesLayoutSupported(const BusesLayout &layouts) const override;
 
     using juce::AudioProcessor::processBlock;
     void processBlock(juce::AudioBuffer<float> &, juce::MidiBuffer &) override;
+
+    using juce::AudioProcessor::processBlockBypassed;
+    void processBlockBypassed(juce::AudioBuffer<float> &, juce::MidiBuffer &) override;
 
     juce::AudioProcessorEditor *createEditor() override;
 
@@ -53,6 +58,8 @@ private:
     void handleAsyncUpdate() override;
 
     void updateLatency();
+
+    void processAudio(juce::AudioBuffer<float> &buffer, bool bypassed);
 
 public:
 

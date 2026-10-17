@@ -126,6 +126,12 @@ void RnNoiseAudioProcessor::releaseResources() {
     m_rnNoisePlugin.reset();
 }
 
+void RnNoiseAudioProcessor::reset() {
+    if (m_rnNoisePlugin) {
+        m_rnNoisePlugin->reset();
+    }
+}
+
 bool RnNoiseAudioProcessor::isBusesLayoutSupported(const BusesLayout &layouts) const {
     if (layouts.getMainInputChannelSet() == juce::AudioChannelSet::disabled()
         || layouts.getMainOutputChannelSet() == juce::AudioChannelSet::disabled())
@@ -141,7 +147,19 @@ bool RnNoiseAudioProcessor::isBusesLayoutSupported(const BusesLayout &layouts) c
 void RnNoiseAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
                                          juce::MidiBuffer &midiMessages) {
     juce::ignoreUnused(midiMessages);
+    processAudio(buffer, false);
+}
 
+/* The bypassed output is the dry input, delayed by the reported latency.
+ * RNNoise continues to process the input. Thus the queue has no old audio when the bypass ends.
+ */
+void RnNoiseAudioProcessor::processBlockBypassed(juce::AudioBuffer<float> &buffer,
+                                                 juce::MidiBuffer &midiMessages) {
+    juce::ignoreUnused(midiMessages);
+    processAudio(buffer, true);
+}
+
+void RnNoiseAudioProcessor::processAudio(juce::AudioBuffer<float> &buffer, bool bypassed) {
     juce::ScopedNoDenormals noDenormals;
 
     auto totalNumInputChannels = getTotalNumInputChannels();
@@ -169,12 +187,12 @@ void RnNoiseAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
         return;
     }
 
-    const float mix = m_mixParam->get();
+    const float dryMix = bypassed ? 1.0f : 1.0f - m_mixParam->get();
     const float vadThreshold = std::min(m_vadThresholdParam->get(), k_maxVadThreshold);
     m_rnNoisePlugin->process(in, out, static_cast<size_t>(numSamples), vadThreshold,
                              static_cast<uint32_t>(m_vadGracePeriodParam->get()),
                              static_cast<uint32_t>(m_vadRetroactiveGracePeriodParam->get()),
-                             1.0f - mix);
+                             dryMix);
 }
 
 //==============================================================================
