@@ -99,6 +99,44 @@ jobs:
         working-directory: ${{runner.workspace}}/build/src/common/
         run: ctest
 
+      - name: Validate plugins with pluginval
+        shell: bash
+        working-directory: ${{runner.workspace}}
+        env:
+          PLUGINVAL_VERSION: v1.0.4
+        run: |
+          case "${{ runner.os }}" in
+            Linux) zip=pluginval_Linux.zip; pluginval=./pluginval ;;
+            macOS) zip=pluginval_macOS.zip; pluginval=./pluginval.app/Contents/MacOS/pluginval ;;
+            Windows) zip=pluginval_Windows.zip; pluginval=./pluginval.exe ;;
+          esac
+          curl -fsSL -o "$zip" "https://github.com/Tracktion/pluginval/releases/download/${PLUGINVAL_VERSION}/$zip"
+          cmake -E tar xf "$zip"
+
+          # Validate all plugins that this build made. Push builds make only VST2.
+          shopt -s nullglob
+          plugins=(build/bin/vst/*.so build/bin/vst/*.dll build/bin/vst/*.vst build/bin/*.vst3 build/bin/*.lv2)
+          if [ ${#plugins[@]} -eq 0 ]; then
+            echo "No plugins found in build/bin"
+            exit 1
+          fi
+          failed=0
+          for plugin in "${plugins[@]}"; do
+            echo "::group::pluginval $plugin"
+            "$pluginval" --strictness-level 10 --skip-gui-tests --validate-in-process --validate "$plugin" || failed=1
+            echo "::endgroup::"
+          done
+          exit $failed
+
+      - name: Validate AU with auval
+        if: ${{ runner.os == 'macOS' && env.full_build == 1 }}
+        run: |
+          # auval finds only installed Audio Units.
+          mkdir -p ~/Library/Audio/Plug-Ins/Components
+          cp -R ${{runner.workspace}}/build/bin/rnnoise.component ~/Library/Audio/Plug-Ins/Components/
+          killall -9 AudioComponentRegistrar || true
+          auval -v aufx Rnn1 Werm
+
       - name: Upload artifacts
         id: upload-artifacts
         uses: actions/upload-artifact@v4
