@@ -25,6 +25,15 @@ void RnNoiseCommonPlugin::deinit() {
     m_channels.clear();
 }
 
+void RnNoiseCommonPlugin::reset() {
+    for (auto &channel: m_channels) {
+        rnnoise_init(channel.denoiseState.get(), nullptr);
+        std::fill(channel.pendingInput.begin(), channel.pendingInput.end(), 0.f);
+        std::fill(channel.dryHistory.begin(), channel.dryHistory.end(), 0.f);
+    }
+    resetQueue();
+}
+
 uint32_t RnNoiseCommonPlugin::getLatencySamples(uint32_t retroactiveVADGraceBlocks) {
     retroactiveVADGraceBlocks = std::min(retroactiveVADGraceBlocks, k_maxRetroactiveVADGraceBlocks);
     return static_cast<uint32_t>((k_rnnoiseDelayBlocks + 1 + retroactiveVADGraceBlocks) * k_denoiseBlockSize);
@@ -251,14 +260,6 @@ void RnNoiseCommonPlugin::pushSilentChunkFront() {
 }
 
 void RnNoiseCommonPlugin::createDenoiseState() {
-    m_newOutputIdx = 0;
-    m_hasLastOutputIdxOverVADThreshold = false;
-    m_lastOutputIdxOverVADThreshold = 0;
-    m_retroactiveVADGraceBlocks = 0;
-    m_pendingFrames = 0;
-    m_queueHead = 0;
-    m_queueSize = 0;
-
     for (uint32_t i = 0; i < m_channelCount; i++) {
         auto denoiseState = std::shared_ptr<DenoiseState>(rnnoise_create(nullptr), [](DenoiseState *st) {
             rnnoise_destroy(st);
@@ -270,6 +271,19 @@ void RnNoiseCommonPlugin::createDenoiseState() {
         channel.queue.resize(k_queueCapacity);
         m_channels.push_back(std::move(channel));
     }
+
+    resetQueue();
+}
+
+void RnNoiseCommonPlugin::resetQueue() {
+    m_newOutputIdx = 0;
+    m_hasLastOutputIdxOverVADThreshold = false;
+    m_lastOutputIdxOverVADThreshold = 0;
+    /* The next process() call adds the silent retroactive grace blocks again. */
+    m_retroactiveVADGraceBlocks = 0;
+    m_pendingFrames = 0;
+    m_queueHead = 0;
+    m_queueSize = 0;
 
     /* One buffer block is necessary to write any number of frames to the output. */
     pushSilentChunkFront();

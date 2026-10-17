@@ -32,6 +32,12 @@ public:
     void deinit();
 
     /**
+     * Clears all queued audio and the RNNoise state. It does not allocate memory, so the audio
+     * thread can call it. The latency does not change.
+     */
+    void reset();
+
+    /**
      *
      * @param in
      * @param out
@@ -66,6 +72,7 @@ private:
     struct OutputChunk;
 
     void createDenoiseState();
+    void resetQueue();
     void processBlock(float vadThreshold, uint32_t vadGracePeriodBlocks, RnNoiseStats &stats);
     void outputFrames(float **out, size_t outOffset, size_t frames, float dryMix);
     void dropFrames(size_t frames);

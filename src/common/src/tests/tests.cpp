@@ -310,3 +310,43 @@ TEST_CASE("Dry mix blends processed output with delayed input", "[common_plugin]
         }
     }
 }
+
+TEST_CASE("Reset clears queued audio and RNNoise state", "[common_plugin][latency]") {
+    constexpr auto channels = 2;
+    auto retroactiveBlocks = GENERATE(0u, 3u);
+
+    CAPTURE(retroactiveBlocks);
+
+    /* 1000 frames is not a full number of blocks. Thus some input is pending at the reset. */
+    const Signal before = makeSignal(channels, 1000, 17);
+    const Signal after = makeSignal(channels, 48000, 19);
+    const std::vector<size_t> blockSizes = {200, 512, 37};
+
+    RnNoiseCommonPlugin freshPlugin(channels);
+    RnNoiseCommonPlugin resetPlugin(channels);
+    freshPlugin.init();
+    resetPlugin.init();
+
+    processInBlocks(resetPlugin, before, blockSizes, 0.f, 20, retroactiveBlocks, 0.f);
+    resetPlugin.reset();
+
+    /* After the reset, the output must be the same as the output of a new plugin. */
+    const Signal expected = processInBlocks(freshPlugin, after, blockSizes, 0.f, 20, retroactiveBlocks, 0.3f);
+    const Signal actual = processInBlocks(resetPlugin, after, blockSizes, 0.f, 20, retroactiveBlocks, 0.3f);
+
+    /* The output must not be silent. Otherwise the test checks nothing. */
+    float energy = 0.f;
+    for (float frame: expected[0]) {
+        energy += frame * frame;
+    }
+    REQUIRE(energy > 1.f);
+
+    for (int ch = 0; ch < channels; ch++) {
+        for (size_t frame = 0; frame < after[ch].size(); frame++) {
+            if (actual[ch][frame] != expected[ch][frame]) {
+                CAPTURE(ch, frame, actual[ch][frame], expected[ch][frame]);
+                FAIL("Output after reset() is not the output of a new plugin");
+            }
+        }
+    }
+}
