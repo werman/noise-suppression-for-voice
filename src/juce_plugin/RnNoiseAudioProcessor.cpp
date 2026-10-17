@@ -3,6 +3,13 @@
 
 #include "common/RnNoiseCommonPlugin.h"
 
+#include <algorithm>
+
+/* RNNoise almost never gives a VAD probability of 1. Thus a threshold of 1 mutes all output.
+ * The LADSPA plugin uses the same limit.
+ */
+static const float k_maxVadThreshold = 0.99f;
+
 //==============================================================================
 RnNoiseAudioProcessor::RnNoiseAudioProcessor()
         : AudioProcessor(BusesProperties()
@@ -163,7 +170,8 @@ void RnNoiseAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
     }
 
     const float mix = m_mixParam->get();
-    m_rnNoisePlugin->process(in, out, static_cast<size_t>(numSamples), m_vadThresholdParam->get(),
+    const float vadThreshold = std::min(m_vadThresholdParam->get(), k_maxVadThreshold);
+    m_rnNoisePlugin->process(in, out, static_cast<size_t>(numSamples), vadThreshold,
                              static_cast<uint32_t>(m_vadGracePeriodParam->get()),
                              static_cast<uint32_t>(m_vadRetroactiveGracePeriodParam->get()),
                              1.0f - mix);
