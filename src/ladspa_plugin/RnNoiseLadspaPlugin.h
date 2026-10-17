@@ -66,6 +66,37 @@ namespace port_info_custom {
     };
 }
 
+/* Returns the number of blocks for a "Retroactive VAD Grace (ms)" value.
+ * The host can give any value, so clamp it to the port range first.
+ * run() and activate() must use the same value, so the reported latency is correct.
+ */
+static uint32_t retroactive_blocks_for_ms(data retroactive_ms) {
+    static const uint32_t ms_in_block = 10;
+    const data clamped_ms = std::max(std::min(retroactive_ms, 200.f), 0.f);
+    return static_cast<uint32_t>(clamped_ms) / ms_in_block;
+}
+
+/* Returns the latency in samples for a "Retroactive VAD Grace (ms)" value. */
+static data latency_for_retroactive_ms(data retroactive_ms) {
+    return static_cast<data>(RnNoiseCommonPlugin::getLatencySamples(retroactive_blocks_for_ms(retroactive_ms)));
+}
+
+/* Writes the latency port in activate().
+ * Some hosts, for example the PipeWire filter-chain, read the latency port only once, after activate().
+ * They do not call run() before that, so run() alone is not sufficient.
+ * The host must connect the ports before activate(), but check them anyway.
+ */
+template<class Plugin, class Ports>
+static void write_latency_on_activate(Ports &ports) {
+    auto latency = ports.template get<Plugin::port_names::out_latency>();
+    if (!latency.is_connected()) {
+        return;
+    }
+    auto retroactive_ms = ports.template get<Plugin::port_names::in_retroactive_vad_grace_blocks>();
+    const data ms = retroactive_ms.is_connected() ? static_cast<const data &>(retroactive_ms) : 0.f;
+    static_cast<data &>(latency) = latency_for_retroactive_ms(ms);
+}
+
 struct RnNoiseMono {
     enum class port_names {
         in_1,
@@ -114,6 +145,10 @@ struct RnNoiseMono {
         m_rnNoisePlugin->deinit();
     }
 
+    void activate(port_array_t<port_names, port_info> &ports) const {
+        write_latency_on_activate<RnNoiseMono>(ports);
+    }
+
     void run(port_array_t<port_names, port_info> &ports) const {
         static const uint32_t ms_in_block = 10;
 
@@ -121,7 +156,7 @@ struct RnNoiseMono {
         buffer out_buffer = ports.get<port_names::out_1>();
         uint32_t vad_threshold = ports.get<port_names::in_vad_threshold>();
         uint32_t vad_grace_period_blocks = ports.get<port_names::in_vad_grace_period_blocks>() / ms_in_block;
-        uint32_t retroactive_vad_grace_blocks = ports.get<port_names::in_retroactive_vad_grace_blocks>() / ms_in_block;
+        uint32_t retroactive_vad_grace_blocks = retroactive_blocks_for_ms(ports.get<port_names::in_retroactive_vad_grace_blocks>());
         float dry_mix = std::max(std::min(static_cast<float>(ports.get<port_names::in_placeholder2>()), 1.f), 0.f);
 
         float vad_threshold_normalized = std::max(std::min(vad_threshold / 100.f, 0.99f), 0.f);
@@ -192,6 +227,10 @@ struct RnNoiseStereo {
         m_rnNoisePlugin->deinit();
     }
 
+    void activate(port_array_t<port_names, port_info> &ports) const {
+        write_latency_on_activate<RnNoiseStereo>(ports);
+    }
+
     void run(port_array_t<port_names, port_info> &ports) const {
         static const uint32_t ms_in_block = 10;
 
@@ -203,7 +242,7 @@ struct RnNoiseStereo {
 
         uint32_t vad_threshold = ports.get<port_names::in_vad_threshold>();
         uint32_t vad_grace_period_blocks = ports.get<port_names::in_vad_grace_period_blocks>() / ms_in_block;
-        uint32_t retroactive_vad_grace_blocks = ports.get<port_names::in_retroactive_vad_grace_blocks>() / ms_in_block;
+        uint32_t retroactive_vad_grace_blocks = retroactive_blocks_for_ms(ports.get<port_names::in_retroactive_vad_grace_blocks>());
         float dry_mix = std::max(std::min(static_cast<float>(ports.get<port_names::in_placeholder2>()), 1.f), 0.f);
 
         float vad_threshold_normalized = std::max(std::min(vad_threshold / 100.f, 0.99f), 0.f);

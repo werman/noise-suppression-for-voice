@@ -333,7 +333,8 @@ namespace ladspa
     {
         T* _data;
     public:
-        pointer_template() {}
+        // An unconnected port has a null pointer.
+        pointer_template() : _data(nullptr) {}
         pointer_template(T* _in_data)
                 : _data(_in_data) {}
         pointer_template(T* _in_data, int )
@@ -341,6 +342,9 @@ namespace ladspa
 
         void assign(T* _in_data) { _data = _in_data; }
         void set_size(std::size_t _in_size) const {}
+
+        //! Returns true if the host connected this port.
+        bool is_connected() const { return _data != nullptr; }
 
         operator const T&() const { return *_data; }
         operator T&() { return *_data; }
@@ -835,6 +839,20 @@ namespace ladspa
             plugin.run(_ports);
         }
 
+        // Call Plugin::activate() only if the plugin has it.
+        template<class _Plugin>
+        static auto call_activate(_Plugin& p, _port_array_t& ports, int)
+        -> decltype(p.activate(ports), void()) {
+            p.activate(ports);
+        }
+        template<class _Plugin>
+        static void call_activate(_Plugin&, _port_array_t&, long) {}
+
+        void activate() {
+            _ports.set_current_sample_count(0);
+            call_activate(plugin, _ports, 0);
+        }
+
         void connect_port(int _port, data* d) {
             _ports.set_caller(_port, d);
         }
@@ -908,7 +926,11 @@ namespace ladspa
 		constexpr static bool value = port_info[i].descriptor.is(port_types::audio);
 	};*/
 
-        //void _activate(LADSPA_Handle Instance);
+        static void _activate(LADSPA_Handle _instance)
+        {
+            static_cast<_plugin_holder_t*>(_instance)->activate();
+        }
+
         static void _run(LADSPA_Handle _instance,
                          sample_size_t _sample_count)
         {
@@ -946,7 +968,7 @@ namespace ladspa
                         descriptor.implementation_data,
                         _instantiate<Plugin>,
                         _connect_port,
-                        nullptr, //_activate,
+                        _activate,
                         _run,
                         nullptr, // run_adding
                         nullptr, // set_run_adding_gain

@@ -44,9 +44,24 @@ There is a minimalistic GUI with all parameters and diagnostic stats:
   Higher values are stricter. In most cases the threshold between 85% - 95% would be fine.
   Without the VAD some loud noises may still be a bit audible when there is no voice.
 - `VAD Grace Period (ms)` - for how long after the last voice detection the output won't be silenced. This helps when ends of words/sentences are being cut off.
-- `Retroactive VAD Grace Period (ms)` - similar to `VAD Grace Period (ms)` but for starts of words/sentences. :warning: This introduces latency!
+- `Retroactive VAD Grace Period (ms)` - similar to `VAD Grace Period (ms)` but for starts of words/sentences. :warning: This adds latency equal to the retroactive grace (see [Latency](#latency)).
 - `Mix` - dry/wet blend for VST/VST3/LV2/AU/AUv3. `0` is dry input only, `1` is fully processed output.
 - `Dry Mix` - LADSPA-only, how much of dry input is mixed in. To keep backwards config compatibility - `0` is wet, `1` is dry.
+
+### Latency
+
+The plugin has a fixed latency of 30 ms (1440 samples at 48 kHz) when `Retroactive VAD Grace Period (ms)` is `0`.
+Retroactive grace adds the same amount of latency, in steps of 10 ms (480 samples at 48 kHz). For example, 20 ms of retroactive grace gives 50 ms of latency.
+
+The latency does not depend on the host block size or on the PipeWire quantum.
+The dry signal (`Mix` / `Dry Mix`) is delayed by the same amount, so dry and wet stay aligned.
+
+- VST/VST3/LV2/AU/AUv3 report the latency to the host, so hosts with latency compensation can align the track.
+- LADSPA has no standard way to report latency. The plugin has an extra output control port named `latency` (the last port), which gives the latency in samples.
+  Hosts that know this convention can read it.
+
+Some hosts read the latency only when they activate or re-activate the plugin.
+If you change `Retroactive VAD Grace Period (ms)` while audio runs, the host may keep the old value until the plugin is re-activated.
 
 ### Windows + Equalizer APO (VST2)
 
